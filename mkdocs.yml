@@ -1,0 +1,45 @@
+site_name: Projektarbeit – <Projektname>
+site_description: Dokumentation und Steckbrief der Projektarbeit
+site_author: <Vorname Nachname>
+
+theme:
+  name: material
+  language: de
+  logo: img/htwk-logo-white.png
+  favicon: img/htwk-logo.jpg
+  palette:
+    - scheme: default
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Dark Mode
+    - scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Light Mode
+  features:
+    - navigation.instant
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Start: index.md
+  - Dokumentation:
+      - Übersicht: dokumentation.md
+      - Anleitung: anleitung.md
+      - Typst: typst.md
+  - Downloads: downloads.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

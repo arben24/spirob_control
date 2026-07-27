@@ -1,0 +1,27 @@
+# --- Betriebssystem ---
+.DS_Store
+Thumbs.db
+
+# --- Editoren / IDEs ---
+.vscode/
+.idea/
+*.swp
+
+# --- Python (global) ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# --- MkDocs / Website-Build ---
+public/
+site/
+
+# --- CI-Build-Output: PDFs werden bei jedem Pipeline-Lauf neu erzeugt und
+# nicht versioniert (siehe .gitlab-ci.yml) ---
+/pdf/
+docs/pdf/
+
+# --- CI / Sonstiges ---
+*.log
+.env

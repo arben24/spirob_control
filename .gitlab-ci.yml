@@ -1,0 +1,87 @@
+stages:
+  - report
+  - slides
+  - expose
+  - website
+
+# ---------------------------------------------------------------------------
+# Job 4: Statische Website bauen und via GitLab Pages veröffentlichen
+# ---------------------------------------------------------------------------
+pages:
+  stage: website
+  image: python:3.12-slim
+  # PDFs der anderen Jobs werden benoetigt, damit die Downloads-Links auf der
+  # Website (siehe mkdocs.yml) funktionieren. "needs" sorgt dafuer, dass dieser
+  # Job trotz frueherer Stage erst nach den PDF-Builds startet.
+  needs:
+    - build_report
+    - build_slides
+    - build_expose
+  before_script:
+    - pip install --no-cache-dir mkdocs mkdocs-material
+  script:
+    # README wird zur Startseite der Website
+    - cp README.md docs/index.md
+    # PDFs fuer die Downloads-Sektion der Website verfuegbar machen
+    - mkdir -p docs/pdf
+    - cp pdf/report.pdf pdf/slides.pdf pdf/expose.pdf docs/pdf/
+    - mkdocs build -d public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ---------------------------------------------------------------------------
+# Job 1: Schriftliche Arbeit (report/main.typ) zu PDF kompilieren
+# ---------------------------------------------------------------------------
+build_report:
+  stage: report
+  image:
+    name: pandoc/typst:latest
+    # Entrypoint des Images ist "pandoc" -> zuruecksetzen, damit "typst" direkt laeuft
+    entrypoint: [""]
+  script:
+    - mkdir -p pdf
+    - typst compile report/main.typ pdf/report.pdf
+  artifacts:
+    paths:
+      - pdf/report.pdf
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ---------------------------------------------------------------------------
+# Job 2: Präsentation (slides/main.typ) zu PDF kompilieren
+# ---------------------------------------------------------------------------
+build_slides:
+  stage: slides
+  image:
+    name: pandoc/typst:latest
+    # Entrypoint des Images ist "pandoc" -> zuruecksetzen, damit "typst" direkt laeuft
+    entrypoint: [""]
+  script:
+    - mkdir -p pdf
+    - typst compile slides/main.typ pdf/slides.pdf
+  artifacts:
+    paths:
+      - pdf/slides.pdf
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ---------------------------------------------------------------------------
+# Job 3: Exposé (expose/main.typ) zu PDF kompilieren
+# ---------------------------------------------------------------------------
+build_expose:
+  stage: expose
+  image:
+    name: pandoc/typst:latest
+    # Entrypoint des Images ist "pandoc" -> zuruecksetzen, damit "typst" direkt laeuft
+    entrypoint: [""]
+  script:
+    - mkdir -p pdf
+    - typst compile expose/main.typ pdf/expose.pdf
+  artifacts:
+    paths:
+      - pdf/expose.pdf
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

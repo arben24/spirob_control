@@ -1,0 +1,18 @@
+# Feinere Gliederung: alles, was nur den Quellcode in src/ betrifft.
+
+# Build-Ordner (Beispiel – wird von Build-Tools erzeugt, nicht eingecheckt)
+build/
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Kompilierte Objekte / Binaries
+*.o
+*.obj
+*.exe
