@@ -1,0 +1,19 @@
+# Laufzeit-Abhängigkeiten der GUI.
+#
+# Bewusst kurz gehalten: PyTorch, mjlab und rsl_rl braucht nur das Training,
+# nicht diese Oberfläche - die Policies liegen als NumPy-Gewichte im Repo
+# (siehe spirob_control/assets/policies und tools/export_policy.py).
+#
+# Installation (Windows, PowerShell oder Eingabeaufforderung):
+#     py -3 -m venv .venv
+#     .venv\Scripts\python -m pip install -r requirements.txt
+#     .venv\Scripts\python -m spirob_control
+
+mujoco>=3.2        # Physik und 3D-Ansicht des digitalen Zwillings
+numpy>=1.26        # Policy-Vorwärtspass und Signalverarbeitung
+pyserial>=3.5      # serielle Verbindung zum ESP32-Motorcontroller
+pillow>=10.0       # schnelle Übergabe der gerenderten Bilder an Tk (optional,
+                   # ohne Pillow zeichnet die GUI etwas langsamer weiter)
+
+# Tkinter gehört zur Standardbibliothek und wird bei der offiziellen
+# Python-Installation für Windows automatisch mitinstalliert.

@@ -1,13 +1,13 @@
 #import "template.typ": project
 
 #show: project.with(
-  title: "<Projektname>",
-  subtitle: "<Modulnummer - Modulname>",
+  title: "SpiRob Control",
+  subtitle: "Eine grafische Bedienoberfläche für den seilzuggetriebenen Tentakelgreifer SpiRob",
   // Bei Gruppenarbeiten alle Namen eintragen, z. B. durch Kommas getrennt:
   // author: "Max Mustermann, Erika Musterfrau",
-  author: "<Vorname Nachname>",
-  supervisor: "<Name Betreuer:in>",
-  faculty: "<Studiengang / Fakultät>",
+  author: "Nico Beyer",
+  supervisor: "<Name Betreuer:in eintragen>",
+  faculty: "<Studiengang / Fakultät eintragen>",
   date: none, // none = heutiges Datum automatisch einsetzen, oder z. B. "26. März 2026"
 )
 

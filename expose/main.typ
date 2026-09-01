@@ -1,56 +1,62 @@
 #import "template.typ": expose, hinweis
 
 #show: expose.with(
-  title: "<Arbeitstitel der Abschlussarbeit>",
-  author: "<Vorname Nachname>",
-  supervisor: "<Name Betreuer:in>",
-  date: none, // none = heutiges Datum automatisch einsetzen, oder z. B. "26. März 2026"
+  title: "SpiRob Control - eine grafische Bedienoberfläche für einen seilzuggetriebenen Tentakelgreifer",
+  author: "Nico Beyer",
+  supervisor: "<Name Betreuer:in eintragen>",
+  date: none,
 )
 
 = Zielstellung
 
-#hinweis[
-  Was ist das übergeordnete Ziel der Arbeit? Welches Problem soll gelöst
-  bzw. welcher Beitrag geleistet werden? 3-5 Sätze reichen meist aus.
-]
+Der SpiRob ist ein seilzuggetriebener Tentakelgreifer nach dem Vorbild
+logarithmisch gewundener Spiralen @wang_2025: eine Kette aus 14 Segmenten, die
+von nur zwei Seilen gebogen wird. Für ihn existieren bereits ein
+Simulationsmodell, eine Firmware für die Kraftregelung und mehrere im
+Reinforcement Learning trainierte Regelungen. Bedienen ließ er sich bisher
+allerdings nur über die Schieberegler des MuJoCo-Viewers oder über
+Kommandozeilenwerkzeuge, die die vollständige Trainingsumgebung samt PyTorch
+und GPU voraussetzen.
 
-#"<Kurzer Text: Worum geht es in der Arbeit und was soll am Ende erreicht sein?>"
+Ziel der Arbeit ist eine eigenständige, bewusst einfache grafische
+Bedienoberfläche, die den Roboter auf zwei Wegen fahrbar macht: von Hand über
+zwei Schieberegler für die Seilkräfte und über eine trainierte Policy, der nur
+noch die Zielposition der Spitze vorgegeben wird. Die Oberfläche soll die
+Simulation und die reale Hardware in einem Programm zusammenführen, ohne
+Trainingsbibliotheken auskommen und auf einem beliebigen Windows-Rechner nach
+dem Klonen des Repositories startbar sein.
 
 = Forschungsfragen
 
-#hinweis[
-  Welche konkreten Fragen soll die Arbeit beantworten? Meist 2-4 klar
-  formulierte, überprüfbare Fragen, die sich direkt aus der Zielstellung
-  ableiten.
-]
-
-- #"<Forschungsfrage 1>"
-- #"<Forschungsfrage 2>"
-- #"<Forschungsfrage 3>"
+- Lässt sich eine im Reinforcement Learning trainierte Regelung so aus ihrer
+  Trainingsumgebung herauslösen, dass sie ohne PyTorch, ohne die
+  Trainingsbibliotheken und ohne GPU dasselbe Verhalten zeigt - und woran lässt
+  sich das nachweisen?
+- Welche Bedienelemente braucht ein Roboter mit zwei Stellgrößen wirklich,
+  damit sowohl direkte Kraftvorgabe als auch zielbasierte Ansteuerung ohne
+  Vorwissen bedienbar sind?
+- Wie viel Sensorik ist nötig, damit eine solche Policy ihr Ziel hält, und
+  welche der trainierten Varianten ist mit der vorhandenen Hardware
+  überhaupt lauffähig?
+- Wie muss ein Regelkreis aufgebaut sein, der Simulation, Policy und
+  serielle Hardwareanbindung in einem einzigen Prozess bei 50 Hz bedient und
+  dabei gegen abgezogene Kabel, fehlende Treiber und fehlende Grafikbeschleunigung
+  unempfindlich bleibt?
 
 = Zeitplan
-
-#hinweis[
-  Grober zeitlicher Ablauf der Arbeit, z. B. je Phase mit Kalenderwoche
-  oder Datum. Eine einfache Tabelle reicht aus.
-]
 
 #table(
   columns: (auto, 1fr),
   inset: 8pt,
   [*Zeitraum*], [*Phase / Meilenstein*],
-  [#"<KW/Datum>"], [#"<z. B. Einarbeitung, Stand der Technik>"],
-  [#"<KW/Datum>"], [#"<z. B. Konzept / Entwurf>"],
-  [#"<KW/Datum>"], [#"<z. B. Umsetzung>"],
-  [#"<KW/Datum>"], [#"<z. B. Evaluation, Auswertung>"],
-  [#"<KW/Datum>"], [#"<z. B. Schreiben, Abgabe>"],
+  [Woche 1], [Einarbeitung: bestehendes Simulationsmodell, Firmware-Protokoll und trainierte Policies sichten],
+  [Woche 2], [Konzept: Betriebsarten, Bedienelemente, Architektur des Regelkreises festlegen],
+  [Woche 3], [Umsetzung Teil 1: Export der Policies, Nachbau des Beobachtungsvektors, Regelkreis und Tests],
+  [Woche 4], [Umsetzung Teil 2: Oberfläche, 3D- und Schemaansicht, serielle Anbindung, Windows-Start],
+  [Woche 5], [Evaluation: Zielgenauigkeit je Sensor-Level, Zeitverhalten des Regelkreises, Inbetriebnahme an der Hardware],
+  [Woche 6], [Dokumentation, schriftliche Arbeit, Präsentation, Abgabe],
 )
 
 = Literatur
-
-#hinweis[
-  Erste, vorläufige Literaturliste als Ausgangspunkt für die Arbeit - wird
-  im Laufe der Arbeit weiter ergänzt (siehe auch `report/references.bib`).
-]
 
 #bibliography("references.bib", style: "ieee", full: true, title: none)

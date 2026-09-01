@@ -1,119 +1,142 @@
-# Projektarbeit – <Projektname>
+# SpiRob Control – grafische Bedienoberfläche für den Seilzug-Tentakel
 
-> Dieses README ist gleichzeitig der Projekt-Steckbrief **und** die Startseite der
-> generierten Website (via GitLab Pages). Bitte die Platzhalter `<...>` ausfüllen
-> und diesen Hinweis-Block am Ende löschen.
+Eine schlanke Desktop-Anwendung, mit der sich der SpiRob auf zwei Arten fahren
+lässt: **von Hand** über zwei Schieberegler für die beiden Seilkräfte, oder
+**über eine trainierte Policy**, der man nur noch sagt, wohin die Spitze soll.
+Beides läuft immer gegen den mitgelieferten digitalen Zwilling (MuJoCo) und
+kann per Knopfdruck auf die echte Hardware gelegt werden.
+
+![Die Oberfläche im Policy-Betrieb](docs/img/gui-policy.png)
 
 ## Projektinformationen
 
-| Feld            | Wert                     |
-| --------------- | ------------------------ |
-| Projektname     | `<Projektname>`          |
-| Studiengang     | `<Studiengang>`          |
-| Betreuer:in     | `<Name Betreuer:in>`     |
-| Abgabedatum     | `<TT.MM.JJJJ>`           |
+| Feld            | Wert                                                        |
+| --------------- | ----------------------------------------------------------- |
+| Projektname     | SpiRob Control                                               |
+| Studiengang     | `<Studiengang eintragen>`                                    |
+| Betreuer:in     | `<Name Betreuer:in eintragen>`                               |
+| Abgabedatum     | `<TT.MM.JJJJ eintragen>`                                     |
 
 ## Team
 
-Bei einer Einzelarbeit reicht eine Zeile, bei einer Gruppenarbeit bitte alle
-Mitglieder eintragen.
-
-| Name                  |
-| --------------------- |
-| `<Vorname Nachname>`  |
-| `<Vorname Nachname>`  |
+| Name        |
+| ----------- |
+| Nico Beyer  |
 
 ## Kurzbeschreibung (Abstract)
 
-<Kurze Zusammenfassung des Projekts in 3–5 Sätzen: Was wurde gemacht, warum und
-mit welchem Ergebnis?>
-
-> **Beispiel:** *„In diesem Projekt wurde ein Webdienst zur automatisierten
-> Erkennung von Objekten in Kamerabildern mittels eines neuronalen Netzes
-> entwickelt. Ziel war es, die manuelle Sichtprüfung in der Qualitätskontrolle
-> teilweise zu automatisieren. Das entwickelte System erreicht auf dem eigenen
-> Testdatensatz eine Erkennungsgenauigkeit von 94 % und wurde als
-> Prototyp erfolgreich in eine bestehende Anwendung integriert."*
+Der SpiRob ist ein seilzuggetriebener Tentakelgreifer: eine Kette aus 14
+Segmenten, die von zwei Seilen gebogen wird. Bisher ließ er sich nur über die
+Regler des MuJoCo-Viewers oder über Kommandozeilenwerkzeuge ansteuern – für
+Vorführungen, Messreihen und die Inbetriebnahme war das umständlich und
+fehleranfällig. In diesem Projekt ist daraus eine eigenständige grafische
+Oberfläche geworden, die den Roboter in zwei Betriebsarten fährt (Seilkräfte
+von Hand oder Zielposition über eine im Reinforcement Learning trainierte
+Policy), den Zustand gleichzeitig als 3D-Simulation und als Messwerte anzeigt
+und die Kräfte auf Wunsch an den echten ESP32-Motorcontroller weiterreicht.
+Damit die Anwendung auf einem beliebigen Windows-Rechner läuft, wurden die
+trainierten Policies aus dem Trainingsprojekt in ein reines NumPy-Format
+exportiert: die GUI kommt ohne PyTorch, ohne die Trainingsbibliotheken und
+ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
 
 ## Ziele
 
-- <Ziel 1>
-- <Ziel 2>
-- <Ziel 3>
-
-> **Beispiel:**
-> - Implementierung eines Prototyps zur Objekterkennung auf Basis eines
->   vortrainierten neuronalen Netzes
-> - Aufbau und Auswertung eines eigenen Testdatensatzes
-> - Integration des Modells in eine bestehende Anwendung per REST-Schnittstelle
+- Eine Bedienoberfläche, mit der der SpiRob ohne Kommandozeile und ohne
+  Vorwissen gefahren werden kann – zwei Schieberegler genügen.
+- Die im Training gelernten Policies nutzbar machen, ohne die komplette
+  Trainingsumgebung mitzuschleppen.
+- Simulation und Hardware in **einer** Oberfläche, mit klarer Anzeige, welche
+  von beiden gerade Kräfte bekommt.
+- Lauffähig auf einem frisch aufgesetzten Windows-Rechner: klonen,
+  `run_gui.bat` doppelklicken, fertig.
 
 ## Ergebnisse
 
-- <Ergebnis 1>
-- <Ergebnis 2>
-- <Ergebnis 3>
-
-> **Beispiel:**
-> - Prototyp erfolgreich implementiert, getestet und dokumentiert
-> - Erkennungsgenauigkeit von 94 % auf dem Testdatensatz erreicht
-> - REST-Schnittstelle produktiv integriert und im Rahmen der Präsentation
->   demonstriert
+- Die Oberfläche steuert den digitalen Zwilling und die Hardware in einem
+  einzigen Prozess mit stabilen 50 Hz Regeltakt; ein Regelschritt kostet rund
+  0,2 ms, ein gerendertes Bild rund 4 ms (gemessen auf dem Entwicklungsrechner,
+  Anzeige in der Statusleiste).
+- Vier trainierte Policies der Sensor-Ablation (`force`, `tendon`, `imu`,
+  `joints`) sind als NumPy-Gewichte eingebunden und in der Simulation direkt
+  auswählbar. Ihre Zielabweichung im Nachbau stimmt mit den Messwerten am Ende
+  des Trainings überein (z. B. `joints` 42 mm) – der Export und der Nachbau der
+  Beobachtung sind damit nachweislich korrekt.
+- 36 automatisierte Tests sichern die Nahtstelle zwischen Training und GUI ab
+  (Beobachtungslayout, Kraftabbildung, ein vollständiger Rollout bis ans Ziel).
+- Die Anwendung läuft ohne PyTorch, mjlab oder CUDA; installiert werden nur
+  MuJoCo, NumPy, pyserial und Pillow.
 
 ## Verwendete Technologien
 
-- <Technologie / Sprache / Framework 1>
-- <Technologie / Sprache / Framework 2>
+- **Python 3.10+** mit **Tkinter** (Standardbibliothek) für die Oberfläche
+- **MuJoCo** für den digitalen Zwilling und die 3D-Ansicht
+- **NumPy** für den Vorwärtspass der Policies
+- **pyserial** für die serielle Verbindung zum ESP32-Motorcontroller
+- **pytest** für die Tests, **Typst** für die schriftlichen Abgaben,
+  **MkDocs Material** + GitLab CI/CD für Website und PDFs
 
-> **Beispiel:** Python, PyTorch, FastAPI, Docker, GitLab CI/CD, Typst
+## Schnellstart
+
+**Windows:**
+
+```bat
+git clone <URL dieses Repositories>
+cd spirob_control\src
+run_gui.bat
+```
+
+`run_gui.bat` legt beim ersten Aufruf eine virtuelle Umgebung an, installiert
+die Abhängigkeiten und startet die Oberfläche. Danach genügt ein Doppelklick
+auf die Datei.
+
+**Linux / macOS:**
+
+```bash
+git clone <URL dieses Repositories>
+cd spirob_control/src
+./run_gui.sh
+```
+
+Ohne angeschlossene Hardware startet die GUI im reinen Simulationsbetrieb –
+alles außer dem Senden echter Kräfte funktioniert sofort. Die ausführliche
+Bedienanleitung steht unter [Bedienung](docs/bedienung.md).
 
 ---
 
 ## Wie funktioniert dieses Repository?
 
-Dieses Repository ist eine Vorlage, die Code, Dokumentation und die schriftlichen
-Abgaben (Arbeit + Präsentation) bündelt. Die PDFs und die Website werden
-**automatisch von der GitLab-CI/CD-Pipeline** gebaut – du musst nichts manuell
-kompilieren.
+Dieses Repository bündelt Code, Dokumentation und die schriftlichen Abgaben.
+Die PDFs und die Website werden **automatisch von der GitLab-CI/CD-Pipeline**
+gebaut – manuell kompiliert werden muss nichts.
 
 | Ordner        | Zweck                                                                      |
 | ------------- | -------------------------------------------------------------------------- |
-| `src/`        | Dein Quellcode. Coding-Regeln stehen in `src/README.md`.                   |
-| `docs/`       | Zusätzliche Markdown-Dokumentation für die Website. Eine kurze Anleitung dazu liegt in `docs/anleitung.md` (auf der Website unter „Dokumentation → Anleitung"). |
-| `expose/`     | Kurzes Exposé (ca. 2-3 Seiten) vor Beginn der eigentlichen Arbeit: Zielstellung, Forschungsfragen, Zeitplan, Literatur. |
-| `report/`     | Die schriftliche Arbeit in Typst: `main.typ` bindet Layout (`template.typ`), die 7 Kapitel (`Sections/`, von Motivation bis Zusammenfassung/Ausblick) und Literatur (`references.bib`) ein. |
-| `slides/`     | Die Präsentation, ebenfalls in Typst (`main.typ` + `template.typ`) – funktioniert genauso wie `report/`, nur ohne Kapitel-Struktur. Alles zu Typst (was es ist, lokale Nutzung, Beispiele) steht in `docs/typst.md` (auf der Website unter „Dokumentation → Typst"). |
-| `extra/`      | Zusätzliches Material, das in keinen anderen Ordner passt (z. B. Datensätze, Messwerte, Exporte, Rohbilder). |
+| `src/`        | Der komplette Quellcode der GUI (`spirob_control/`), die Tests (`tests/`), das Exportwerkzeug für Policies (`tools/`) und die Startskripte. Details in `src/README.md`. |
+| `docs/`       | Die Projektdokumentation, aus der die Website entsteht: Installation, Bedienung, Architektur, Hardware und Policies. |
+| `expose/`     | Kurzes Exposé: Zielstellung, Forschungsfragen, Zeitplan, Literatur.        |
+| `report/`     | Die schriftliche Arbeit in Typst (`main.typ` + `Sections/` + `references.bib`). |
+| `slides/`     | Die Präsentation, ebenfalls in Typst.                                      |
+| `extra/`      | Zusätzliches Material (Messreihen, Rohdaten, Exporte).                     |
 
 ### Was passiert automatisch?
 
-Bei jedem Push auf den Branch `main` läuft die Pipeline (`.gitlab-ci.yml`) und:
+Bei jedem Push auf `main` läuft die Pipeline (`.gitlab-ci.yml`) und
 
-1. **Report** – kompiliert `report/main.typ` zu einer PDF (als CI-Artefakt).
-2. **Slides** – kompiliert `slides/main.typ` zu einer PDF (als CI-Artefakt).
-3. **Exposé** – kompiliert `expose/main.typ` zu einer PDF (als CI-Artefakt).
-4. **Website** – baut aus diesem README und `docs/` eine statische Website
-   (inkl. Downloads-Seite mit allen drei PDFs) und veröffentlicht sie über
-   **GitLab Pages**.
+1. kompiliert `report/main.typ` zu einer PDF,
+2. kompiliert `slides/main.typ` zu einer PDF,
+3. kompiliert `expose/main.typ` zu einer PDF,
+4. baut aus diesem README und `docs/` die Website (inkl. Downloads-Seite) und
+   veröffentlicht sie über **GitLab Pages**.
 
-Die PDFs werden dabei **nicht** ins Repository zurückcommittet – sie entstehen
-nur temporär während des CI-Laufs und werden anschließend als CI-Artefakt und
-eingebettet auf der Website unter „Downloads" (siehe `docs/downloads.md`)
-bereitgestellt.
+Die PDFs werden nicht ins Repository zurückgeschrieben; sie entstehen nur im
+CI-Lauf und hängen dort als Artefakt bzw. auf der Website unter „Downloads“.
 
-### Was musst du tun?
+### Was ist noch zu tun?
 
-1. Falls noch nicht geschehen: Git/SSH einrichten, damit du überhaupt
-   committen und pushen kannst – Schritt-für-Schritt-Anleitung (Windows und
-   Linux) in `docs/git-ssh.md` (auf der Website unter „Dokumentation → Git
-   & SSH").
-2. Metadaten und Abschnitte oben in diesem README ausfüllen.
-3. Deinen Code in `src/` ablegen und die Coding-Regeln in `src/README.md` beachten.
-4. Zu Beginn das Exposé in `expose/main.typ` ausfüllen (Zielstellung,
-   Forschungsfragen, Zeitplan, Literatur).
-5. Die schriftliche Arbeit in `report/` (die 7 Kapitel in `report/Sections/`
-   nach und nach ausfüllen – die Hinweis-Kästen je Kapitel zeigen, was
-   erwartet wird) und die Präsentation in `slides/main.typ` schreiben.
-   Hinweise zu Typst gibt es in `docs/typst.md`.
-6. Optional: zusätzliche Doku-Seiten in `docs/` anlegen und in `mkdocs.yml`
-   verlinken.
-7. Committen und pushen – den Rest erledigt die Pipeline.
+- Die drei mit `<...>` markierten Felder oben (Studiengang, Betreuer:in,
+  Abgabedatum) ausfüllen.
+- Exposé, schriftliche Arbeit und Präsentation weiter ausformulieren – die
+  Rohfassungen in `expose/`, `report/` und `slides/` sind bereits mit dem
+  Inhalt dieses Projekts gefüllt.
+- Messreihen auf der echten Hardware ergänzen (siehe
+  [Hardware](docs/hardware.md), Abschnitt „Was noch fehlt“).

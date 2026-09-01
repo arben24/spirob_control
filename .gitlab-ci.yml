@@ -20,8 +20,11 @@ pages:
   before_script:
     - pip install --no-cache-dir mkdocs mkdocs-material
   script:
-    # README wird zur Startseite der Website
-    - cp README.md docs/index.md
+    # README wird zur Startseite der Website. Dabei werden Pfade der Form
+    # "docs/..." auf "..." gekuerzt: im Repository zeigen die Links und Bilder
+    # aus dem README korrekt in den docs-Ordner, auf der Website liegt die
+    # Startseite aber selbst schon darin.
+    - sed -E 's#\]\(docs/#](#g' README.md > docs/index.md
     # PDFs fuer die Downloads-Sektion der Website verfuegbar machen
     - mkdir -p docs/pdf
     - cp pdf/report.pdf pdf/slides.pdf pdf/expose.pdf docs/pdf/

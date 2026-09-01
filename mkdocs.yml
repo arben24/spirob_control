@@ -1,6 +1,6 @@
-site_name: Projektarbeit – <Projektname>
-site_description: Dokumentation und Steckbrief der Projektarbeit
-site_author: <Vorname Nachname>
+site_name: SpiRob Control
+site_description: Grafische Bedienoberfläche für den Seilzug-Tentakel SpiRob – Handbetrieb, trainierte Policy, digitaler Zwilling
+site_author: Nico Beyer
 
 theme:
   name: material
@@ -29,7 +29,12 @@ nav:
   - Start: index.md
   - Dokumentation:
       - Übersicht: dokumentation.md
-      - Anleitung: anleitung.md
+      - Installation: installation.md
+      - Bedienung: bedienung.md
+      - Architektur: architektur.md
+      - Hardware: hardware.md
+      - Policies: policies.md
+      - Anleitung (Vorlage): anleitung.md
       - Typst: typst.md
       - Git & SSH: git-ssh.md
   - Downloads: downloads.md

@@ -3,90 +3,161 @@
 #import "template.typ": praesentation, htwk-title-slide, footer-text
 #import "template.typ": htwk-blue, htwk-cyan, htwk-gray, htwk-lightgray
 
-// Text der Fußzeile (erscheint klein unten auf jeder Folie außer der Titelfolie)
-#footer-text.update("<Projektname> | <Vorname Nachname>")
+#footer-text.update("SpiRob Control | Nico Beyer")
 
 #show: praesentation
 
 #htwk-title-slide(
-  title: "<Projektname>",
-  subtitle: "<Kurze Beschreibung des Projekts / Modulname>",
-  author: "<Vorname Nachname>",
+  title: "SpiRob Control",
+  subtitle: "Eine grafische Bedienoberfläche für einen seilzuggetriebenen Tentakelgreifer",
+  author: "Nico Beyer",
   date: [#datetime.today().display("[day].[month].[year]")],
   institution: "<Studiengang> | HTWK Leipzig",
 )
 
 == Agenda
-// #outline() erzeugt automatisch ein Inhaltsverzeichnis aus allen
-// Überschriften der Ebene 1 (den Kapitel-Trennfolien weiter unten).
 #outline(title: none, indent: 1.5em, depth: 1)
 
-// ---------------------------------------------------------------------
-// Eine Überschrift der Ebene 1 (ein einzelnes "=") erzeugt automatisch
-// eine eigene, vollflächige blaue Trennfolie mit dem Kapitelnamen.
-// ---------------------------------------------------------------------
-= Kapitel 1: Einleitung
+= Ausgangslage
 
-// Überschriften der Ebene 2 ("==") sind normale Folientitel mit dem
-// HTWK-Tape-Branding davor (siehe template.typ).
-== Beispiel: Aufzählung
-- Erster Stichpunkt
-- Zweiter Stichpunkt
-  - Ein Unterpunkt (einfach einrücken)
-- *Wichtiger* Punkt lässt sich fett hervorheben
-
-== Beispiel: Grid-Layout mit Bild
-// #grid(...) teilt eine Folie in mehrere Spalten - praktisch für
-// Text-neben-Bild-Layouts.
+== Der SpiRob
 #grid(
   columns: (1fr, 1fr),
   gutter: 1.5em,
   [
-    === Text-Spalte
-    - Beliebiger Inhalt links, z. B. Erklärungen
-    - Auch Formeln sind möglich: $E = m c^2$
+    - Tentakelgreifer nach dem Vorbild einer logarithmischen Spirale
+    - 14 Segmente, 13 Gelenke - alle in *einer* Ebene
+    - Angetrieben von genau *zwei Seilen*
+    - Die Firmware regelt die *Zugkraft*, 0 - 150 N je Seil
+
+    === Der Kern des Problems
+    Zwei Zahlen bestimmen die Form eines Arms mit dreizehn Gelenken.
   ],
   [
     #align(center + horizon)[
       #rect(stroke: 0.5pt + htwk-lightgray, inset: 6pt, radius: 4pt)[
-        #image("Images/CylinderImage.jpg", height: 8em)
+        #image("Images/gui-schema.png", height: 11em)
         #v(0.2em)
-        #text(size: 7pt, fill: htwk-gray)[Beispielbild mit kleiner Bildunterschrift]
+        #text(size: 7pt, fill: htwk-gray)[Die Oberfläche in der Schema-Ansicht, mit erreichbarem Arbeitsraum]
       ]
     ]
   ]
 )
 
-= Kapitel 2: Ergebnisse
-
-== Beispiel: Tabelle
-#figure(
-  table(
-    columns: (auto, auto, auto),
-    inset: 8pt,
-    align: horizon,
-    [*Parameter*], [*Wert*], [*Einheit*],
-    [Geschwindigkeit], [10.5], [m/s],
-    [Druck], [101325], [Pa],
-  )
+== Was es schon gab - und was fehlte
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 1.5em,
+  [
+    === Vorhanden
+    - Abgestimmtes MuJoCo-Modell
+    - Firmware mit Kraftregelung (ESP32)
+    - Vier trainierte Policies (PPO)
+  ],
+  [
+    === Bedienbar nur über
+    - Schieberegler des MuJoCo-Viewers
+    - Kommandozeile *mit* PyTorch, mjlab, CUDA
+    - Auf den Controller geflashte Netze
+  ]
 )
 
-== Beispiel: Text farbig hervorheben
+#v(0.5em)
 #align(center)[
   #text(weight: "bold", fill: htwk-cyan)[
-    Wichtige Kernaussagen lassen sich so farblich absetzen.
+    Ziel: eine Oberfläche, die beides bedienbar macht - auf jedem Windows-Rechner.
   ]
 ]
 
-// Unsichtbare Überschrift (erscheint nicht in Agenda/Navigation), sorgt aber
-// für eine sauber abgegrenzte neue Folien-Gruppe - ohne das wuerde der Titel
-// der vorherigen Folie leicht sichtbar durchscheinen.
+= Umsetzung
+
+== Zwei Betriebsarten, jeweils zwei Regler
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 1.5em,
+  [
+    === Handbetrieb
+    - Ein Regler je Seil, 0 - 150 N
+    - Wirkt sofort auf Simulation und (freigegeben) Hardware
+
+    === Policy
+    - Regler für *Winkel* und *Abstand* der Spitze
+    - Die trainierte Regelung stellt die Kräfte, 50-mal je Sekunde
+  ],
+  [
+    #align(center + horizon)[
+      #rect(stroke: 0.5pt + htwk-lightgray, inset: 6pt, radius: 4pt)[
+        #image("Images/gui-policy.png", height: 11em)
+        #v(0.2em)
+        #text(size: 7pt, fill: htwk-gray)[Policy-Betrieb mit 3D-Ansicht und Telemetrie]
+      ]
+    ]
+  ]
+)
+
+== Die Policy ohne PyTorch
+- Der Actor ist ein MLP aus *Linear + ELU*, deterministisch ausgewertet
+- Exportiert werden nur die *Gewichte* plus ein Manifest des Beobachtungslayouts
+- Der Vorwärtspass ist NumPy - kein PyTorch, kein mjlab, keine GPU
+
+#v(0.6em)
+#align(center)[
+  #text(weight: "bold", fill: htwk-cyan)[250 KiB je Policy statt eines Software-Stacks]
+]
+
+#v(0.6em)
+Heikel ist nicht das Netz, sondern der *Beobachtungsvektor*: Termreihenfolge,
+Historie über fünf Takte, die begrenzte letzte Aktion. Stimmt hier etwas nicht,
+rechnet das Netz weiter - der Arm bewegt sich einfach falsch.
+
+== Ein Thread, 50 Hz
+- Regelkreis und Anzeige in *einer* Ereignisschleife - keine Sperren, keine Wettläufe
+- Regelschritt $approx$ 0,1 ms, gerendertes Bild $approx$ 4 ms von 20 ms Budget
+- Verpasste Takte werden übersprungen, nicht nachgeholt
+- Fehler sind Betriebszustände: Kabel ab, kein Treiber, kein OpenGL $arrow.r$ Meldung statt Absturz
+
+= Ergebnisse
+
+== Der Nachbau entspricht dem Training
+#figure(
+  table(
+    columns: (auto, auto, auto, auto),
+    inset: 8pt,
+    align: (left, right, right, right),
+    [*Sensor-Level*], [*Nachbau*], [*Spanne*], [*Training*],
+    [force], [294 mm], [177 - 443 mm], [344 mm],
+    [tendon], [75 mm], [38 - 132 mm], [68 mm],
+    [imu], [91 mm], [21 - 285 mm], [44 mm],
+    [joints], [63 mm], [18 - 116 mm], [42 mm],
+  )
+)
+#text(size: 9pt, fill: htwk-gray)[
+  Mittlerer Zielabstand im eingeschwungenen Zustand, elf Zielwinkel, Simulation.
+  Auch das erwartete *Scheitern* von `force` wird reproduziert - der beste Beleg
+  dafür, dass der Beobachtungsvektor stimmt.
+]
+
+== Stand und Ausblick
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 1.5em,
+  [
+    === Erreicht
+    - Zwei Betriebsarten in einer Oberfläche
+    - Vier Policies ohne Trainingsstack nutzbar
+    - Stabile 50 Hz, 36 automatisierte Tests
+    - `git clone` + Doppelklick unter Windows
+  ],
+  [
+    === Nächste Schritte
+    - Beschleunigungssensor-Platine als zweite Datenquelle
+    - Damit: `imu`/`joints` auf der Hardware und die *gemessene* Spitzenposition
+    - Messreihen am realen Aufbau, Sim-to-Real je Sensor-Level
+  ]
+)
+
 = Abschluss <touying:hidden>
 
-// ---------------------------------------------------------------------
-// Eigene, vollflächige Abschlussfolie (wie die Trennfolien oben) -
-// dafür #slide(...) direkt mit eigener config-page nutzen.
-// ---------------------------------------------------------------------
 #slide(
   config: config-page(
     header: none,

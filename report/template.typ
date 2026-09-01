@@ -50,9 +50,12 @@
   // Mathe-Nummerierung
   set math.equation(numbering: "(1)")
 
-  // Bildunterschriften formatieren
+  // Bildunterschriften formatieren.
+  // `counter.display()` braucht seit Typst 0.12 einen Kontext - ohne das
+  // `context` bricht die Kompilierung ab, sobald das Dokument die erste
+  // Abbildung oder Tabelle enthaelt.
   show figure.caption: it => [
-    #text(size: 9pt)[*#it.supplement #it.counter.display():* #it.body]
+    #text(size: 9pt)[#context [*#it.supplement #it.counter.display():*] #it.body]
   ]
 
   show heading: set block(above: 2em, below: 1.5em) // 1.5em Abstand zwischen Überschrift und folgendem Text
