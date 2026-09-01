@@ -102,14 +102,18 @@ bereitgestellt.
 
 ### Was musst du tun?
 
-1. Metadaten und Abschnitte oben in diesem README ausfüllen.
-2. Deinen Code in `src/` ablegen und die Coding-Regeln in `src/README.md` beachten.
-3. Zu Beginn das Exposé in `expose/main.typ` ausfüllen (Zielstellung,
+1. Falls noch nicht geschehen: Git/SSH einrichten, damit du überhaupt
+   committen und pushen kannst – Schritt-für-Schritt-Anleitung (Windows und
+   Linux) in `docs/git-ssh.md` (auf der Website unter „Dokumentation → Git
+   & SSH").
+2. Metadaten und Abschnitte oben in diesem README ausfüllen.
+3. Deinen Code in `src/` ablegen und die Coding-Regeln in `src/README.md` beachten.
+4. Zu Beginn das Exposé in `expose/main.typ` ausfüllen (Zielstellung,
    Forschungsfragen, Zeitplan, Literatur).
-4. Die schriftliche Arbeit in `report/` (die 7 Kapitel in `report/Sections/`
+5. Die schriftliche Arbeit in `report/` (die 7 Kapitel in `report/Sections/`
    nach und nach ausfüllen – die Hinweis-Kästen je Kapitel zeigen, was
    erwartet wird) und die Präsentation in `slides/main.typ` schreiben.
    Hinweise zu Typst gibt es in `docs/typst.md`.
-5. Optional: zusätzliche Doku-Seiten in `docs/` anlegen und in `mkdocs.yml`
+6. Optional: zusätzliche Doku-Seiten in `docs/` anlegen und in `mkdocs.yml`
    verlinken.
-6. Committen und pushen – den Rest erledigt die Pipeline.
+7. Committen und pushen – den Rest erledigt die Pipeline.

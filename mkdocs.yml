@@ -31,10 +31,12 @@ nav:
       - Übersicht: dokumentation.md
       - Anleitung: anleitung.md
       - Typst: typst.md
+      - Git & SSH: git-ssh.md
   - Downloads: downloads.md
 
 markdown_extensions:
   - admonition
+  - attr_list
   - toc:
       permalink: true
   - pymdownx.highlight
@@ -43,3 +45,5 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
