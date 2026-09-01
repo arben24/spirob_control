@@ -37,6 +37,41 @@ zusammenpassen.
 """
 
 
+SCALE = 1.0
+"""Aktueller Vergrößerungsfaktor der Oberfläche.
+
+Wird von :func:`apply_scale` gesetzt. Zeichenflächen fragen ihn über
+:func:`canvas_font` ab - deren Schriften hängen an keinem Widget und würden
+sonst als einzige nicht mitwachsen.
+"""
+
+_BASE_SIZES: dict[str, int] = {}
+_FONTS: dict[str, tkfont.Font] = {}
+_STYLE: ttk.Style | None = None
+
+
+def canvas_font(size: int, family: str = "TkFixedFont") -> tuple[str, int]:
+  """Schrift für Text auf einer Zeichenfläche, mitskaliert."""
+  return (family, max(6, round(size * SCALE)))
+
+
+def apply_scale(factor: float) -> None:
+  """Alle Schriften und Abstände auf diesen Faktor bringen.
+
+  Die ttk-Stile verweisen auf dieselben Schriftobjekte, deshalb genügt es,
+  deren Größe zu ändern - alle vorhandenen Bedienelemente wachsen sofort mit.
+  """
+  global SCALE
+
+  SCALE = factor
+  for name, font in _FONTS.items():
+    font.configure(size=max(6, round(_BASE_SIZES[name] * factor)))
+  if _STYLE is not None:
+    _STYLE.configure("TButton", padding=(round(10 * factor), round(6 * factor)))
+    _STYLE.configure("Stop.TButton", padding=(round(10 * factor), round(10 * factor)))
+    _STYLE.configure("TNotebook.Tab", padding=(round(12 * factor), round(6 * factor)))
+
+
 def setup(root: tk.Misc) -> dict[str, tkfont.Font]:
   """ttk-Stile setzen und die benutzten Schriften zurückgeben."""
   style = ttk.Style(root)
@@ -113,6 +148,14 @@ def setup(root: tk.Misc) -> dict[str, tkfont.Font]:
   style.configure("TNotebook", background=PANEL, borderwidth=0)
   style.configure("TNotebook.Tab", background=PANEL, foreground=MUTED, padding=(12, 6))
   style.map("TNotebook.Tab", background=[("selected", CARD)], foreground=[("selected", TEXT)])
+
+  # Ausgangsgrößen merken, damit apply_scale immer vom Original ausgeht und
+  # sich Rundungsfehler nicht über viele Schritte aufsummieren.
+  _FONTS.clear()
+  _FONTS.update(fonts)
+  _BASE_SIZES.clear()
+  _BASE_SIZES.update({name: int(font.cget("size")) for name, font in fonts.items()})
+  globals()["_STYLE"] = style
   return fonts
 
 

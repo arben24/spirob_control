@@ -87,3 +87,35 @@ def test_ohne_verbindung_passiert_nichts():
   assert link.signals()["joint_pos"].tolist() == [0.0] * sensors.NUM_JOINTS
   assert link.connect("/dev/gibtesnicht") is False
   assert link.last_error
+
+
+def test_verbinden_scheitert_ohne_frames():
+  """Ein offener Port ohne Datenstrom gilt nicht als Verbindung.
+
+  Genau dieser Fall trat auf, als die GUI die Platine mit der falschen
+  Baudrate ansprach: Der Port ließ sich öffnen, die Oberfläche meldete
+  Erfolg - und es kamen nie Winkel an. Jetzt zählt nur, ob Frames ankommen.
+  """
+  import os
+
+  if not hasattr(os, "openpty"):
+    pytest.skip("Virtuelles Terminal nur unter POSIX verfügbar")
+  pytest.importorskip("serial")
+  master, slave = os.openpty()
+  link = sensors.JointSensorLink()
+  try:
+    assert link.connect(os.ttyname(slave)) is False
+    assert link.connected is False
+    assert "keine Daten" in (link.last_error or "")
+    # Die Meldung nennt jede probierte Baudrate, damit man weiß, was versucht wurde.
+    for baud in sensors.BAUD_CANDIDATES:
+      assert str(baud) in link.last_error
+  finally:
+    link.disconnect()
+    os.close(master)
+    os.close(slave)
+
+
+def test_status_text_nennt_die_ursache():
+  link = sensors.JointSensorLink()
+  assert "nicht verbunden" in link.status_text().lower()

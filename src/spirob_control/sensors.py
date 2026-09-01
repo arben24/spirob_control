@@ -59,8 +59,26 @@ import numpy as np
 from . import kinematics
 from .hardware import SERIAL_AVAILABLE, _FilteredDiff, serial
 
-BAUD_RATE = 1_000_000
-"""Muss zu ``SERIAL_BAUD`` in der Firmware der Sensorplatine passen."""
+BAUD_RATE = 500_000
+"""Baudrate der Sensorplatine.
+
+500000 und nicht die im Frame-Parser des Ursprungsprojekts dokumentierte
+Million: Die Kommandozeilen-Brücke, mit der die Platine nachweislich läuft,
+benutzt diesen Wert (Vorgabe ihres Schalters ``--joint-baud``), und die
+Hardware richtet sich nach dem, was tatsächlich funktioniert - nicht nach dem
+Kommentar in der Firmware.
+"""
+
+BAUD_CANDIDATES = (500_000, 1_000_000)
+"""Reihenfolge, in der beim Verbinden probiert wird.
+
+Die Platine gibt es in zwei Ausbaustufen mit unterschiedlicher Rate, und welche
+angeschlossen ist, sieht man ihr nicht an. Statt den Benutzer raten zu lassen,
+probiert die Verbindung beide durch und behält die, auf der Frames ankommen.
+"""
+
+PROBE_TIMEOUT_S = 0.8
+"""Wie lange je Baudrate auf das erste Frame gewartet wird."""
 
 FRAME_HEADER = b"\xaa\x55"
 FRAME_META = struct.Struct("<IIBB")  # frame_id, t_esp_us, mode, num_sensors
@@ -185,9 +203,12 @@ class JointSensorLink:
   def __init__(self, sign: float = 1.0, vel_alpha: float = 0.15) -> None:
     self._serial = None
     self.port: str | None = None
+    self.baudrate: int | None = None
     self.sign = sign
     self.last_error: str | None = None
     self.frames = 0
+    self.bytes_read = 0
+    self.seen_sensors: set[int] = set()
     self._parser = BinaryFrameParser()
     self._smooth_acc: dict[int, np.ndarray] = {}
     self._angles = np.zeros(NUM_JOINTS)
@@ -208,30 +229,64 @@ class JointSensorLink:
       return False
     return (time.monotonic() - self._last_frame_ts) < FRAME_TIMEOUT_S
 
-  def connect(self, port: str, baudrate: int = BAUD_RATE) -> bool:
+  def connect(self, port: str, baudrate: int | None = None) -> bool:
+    """Port öffnen und auf Frames warten. Ohne ``baudrate`` wird probiert.
+
+    Erfolg heißt hier nicht "Port geöffnet", sondern "es kommen Frames an".
+    Ein offener Port, auf dem nur Rauschen liegt, wäre für den Benutzer die
+    verwirrendste aller Antworten: Die Verbindung sähe gut aus, und die Anzeige
+    bliebe trotzdem leer.
+    """
     if not SERIAL_AVAILABLE:
       self.last_error = "pyserial ist nicht installiert (pip install pyserial)."
       return False
     self.disconnect()
+
+    candidates = (baudrate,) if baudrate else BAUD_CANDIDATES
+    tried: list[str] = []
+    for candidate in candidates:
+      if self._try_baudrate(port, candidate):
+        return True
+      tried.append(f"{candidate} Baud: {'Daten, aber keine Frames' if self.bytes_read else 'keine Daten'}")
+      self.disconnect()
+
+    self.last_error = (
+      f"{port}: keine gültigen Frames ({'; '.join(tried)}). Port, Verkabelung "
+      "und Stromversorgung der Platine prüfen."
+    )
+    return False
+
+  def _try_baudrate(self, port: str, baudrate: int) -> bool:
+    """Einen Versuch mit einer Baudrate; True, sobald ein Frame ankommt."""
     try:
       self._serial = serial.Serial(port=port, baudrate=baudrate, timeout=0.0, write_timeout=0.2)
       time.sleep(0.1)
       self._serial.reset_input_buffer()
       self._serial.write(MODE_COMMAND_ACC)  # nur Beschleunigung, höchste Rate
-      self.port = port
-      self.last_error = None
-      self.frames = 0
-      self._parser = BinaryFrameParser()
-      self._smooth_acc.clear()
-      self._diff.reset()
-      self._last_frame_ts = None
-      self._last_poll_ts = None
-      return True
     except Exception as exc:
       self.last_error = f"{port}: {exc}"
       self._serial = None
-      self.port = None
       return False
+
+    self.port = port
+    self.baudrate = baudrate
+    self.last_error = None
+    self.frames = 0
+    self.bytes_read = 0
+    self.seen_sensors = set()
+    self._parser = BinaryFrameParser()
+    self._smooth_acc.clear()
+    self._diff.reset()
+    self._last_frame_ts = None
+    self._last_poll_ts = None
+
+    deadline = time.monotonic() + PROBE_TIMEOUT_S
+    while time.monotonic() < deadline:
+      self.poll()
+      if self.frames:
+        return True
+      time.sleep(0.01)
+    return False
 
   def disconnect(self) -> None:
     if self._serial is not None:
@@ -241,6 +296,7 @@ class JointSensorLink:
         pass
     self._serial = None
     self.port = None
+    self.baudrate = None
     self._last_frame_ts = None
 
   def _fail(self, exc: Exception) -> None:
@@ -260,7 +316,9 @@ class JointSensorLink:
     try:
       waiting = self._serial.in_waiting
       if waiting:
-        self._parser.add_data(self._serial.read(waiting))
+        data = self._serial.read(waiting)
+        self.bytes_read += len(data)
+        self._parser.add_data(data)
     except Exception as exc:
       self._fail(exc)
       return
@@ -270,6 +328,7 @@ class JointSensorLink:
       return
     self.frames += len(frames)
 
+    self.seen_sensors.update(frames[-1]["sensors"])
     for sensor_id, values in frames[-1]["sensors"].items():
       raw = np.asarray(values, dtype=float)
       previous = self._smooth_acc.get(sensor_id)
@@ -294,6 +353,32 @@ class JointSensorLink:
       "joint_vel": self._diff.vel.copy(),
       "segment_pitch": kinematics.segment_pitch_cos_sin(self._angles),
     }
+
+  def status_text(self) -> str:
+    """Eine Zeile, die sagt, woran es liegt - für die Oberfläche.
+
+    Die drei Fälle sind unterschiedliche Fehler und brauchen unterschiedliche
+    Handgriffe: gar keine Daten (Port oder Strom), Daten ohne Frames
+    (Baudrate), oder Frames mit fehlenden Sensoren (Verkabelung eines
+    einzelnen Sensors).
+    """
+    if not self.connected:
+      return (f"Nicht verbunden ({self.last_error})." if self.last_error
+              else "Sensorplatine nicht verbunden - die Anzeige zeigt die Simulation.")
+    if not self.frames:
+      if not self.bytes_read:
+        return f"{self.port}: keine Daten. Port, Kabel und Stromversorgung prüfen."
+      return (f"{self.port}: Daten, aber keine gültigen Frames - vermutlich die "
+              f"falsche Baudrate ({self.baudrate}).")
+    missing = [sid for sid in SENSOR_IDS if sid not in self.seen_sensors]
+    if missing:
+      return (f"{self.port} @ {self.baudrate} Baud: {self.frames} Frames, aber die "
+              f"Sensoren {missing} fehlen - solange gibt es keine Winkel.")
+    if not self.has_data:
+      return f"{self.port} @ {self.baudrate} Baud: Datenstrom steht seit über einer Sekunde."
+    angles = self.angles_deg()
+    return (f"{self.port} @ {self.baudrate} Baud: {self.frames} Frames, Winkel "
+            f"{angles.min():+.0f}° bis {angles.max():+.0f}°.")
 
   @property
   def joint_angles(self) -> np.ndarray:

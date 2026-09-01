@@ -77,5 +77,8 @@ tatsächlich ans Ziel bringt.
 | Die Portliste bleibt leer | Kein USB-Seriell-Treiber installiert (CP210x, CH340) oder Kabel ohne Datenadern. Nach dem Anstecken „Suchen“ drücken. |
 | Beim Verbinden: „Zugriff verweigert“ / „Port besetzt“ | Ein anderes Programm hält den Port – typischerweise der serielle Monitor der Arduino-IDE oder von PlatformIO. Dort trennen. |
 | Unter Linux: „Permission denied“ auf `/dev/ttyUSB0` | Benutzer zur Gruppe `dialout` hinzufügen: `sudo usermod -aG dialout $USER`, danach neu anmelden. |
+| Sensorplatine: „keine Daten“ | Falscher Port. Die beiden Platinen hängen an verschiedenen Anschlüssen – meist `/dev/ttyUSB0` (Motor) und `/dev/ttyUSB1` (Sensoren) bzw. zwei verschiedene `COM`-Nummern. |
+| Sensorplatine: „Daten, aber keine gültigen Frames“ | Baudrate. Die Oberfläche probiert 500000 und 1000000; sendet die Platine mit einer anderen Rate, muss `BAUD_CANDIDATES` in `src/spirob_control/sensors.py` ergänzt werden. |
+| Die Oberfläche ist zu klein oder zu groß | `Strg` und `+` bzw. `−`, oder die Knöpfe **A−/A+** oben rechts. `Strg` und `0` stellt 100 % wieder her. |
 | Die 3D-Ansicht bleibt leer, in der Statuszeile steht eine Meldung | Kein OpenGL verfügbar (etwa in einer Fernwartungssitzung). Die Oberfläche wechselt automatisch in die Schema-Ansicht. |
 | Die Oberfläche startet, aber der Regeltakt liegt deutlich unter 50 Hz | Sehr langsamer Rechner oder sehr großes Fenster. Auf „Schema“ umschalten – das Rendern entfällt dann. |

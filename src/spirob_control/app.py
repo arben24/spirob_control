@@ -52,6 +52,15 @@ CONTROL_PERIOD_S = 0.02
 
 REFRESH_EVERY = 5  # Zahlen: 10-mal je Sekunde
 
+UI_SCALE_MIN, UI_SCALE_MAX, UI_SCALE_STEP = 0.7, 1.8, 0.1
+"""Grenzen und Schrittweite der Bedienelement-Vergrößerung."""
+
+TELEMETRY_COLUMNS = (150, 110, 150, 110)
+"""Grundbreiten der Telemetriespalten (Beschriftung, Wert, Beschriftung, Wert)."""
+
+SIDEBAR_BASE_WIDTH = 440
+"""Breite der Seitenleiste bei Faktor 1,0; wächst mit der Schrift mit."""
+
 RENDER_EVERY_MIN = 2
 """Schnellste Bildrate: jeder zweite Takt, also 25 Bilder je Sekunde."""
 
@@ -83,6 +92,9 @@ class SpirobApp(tk.Tk):
 
     self._policies = {info.label: info for info in policy_module.available_policies()}
     self._tick_count = 0
+    self._ui_scale = 1.0
+    self._wrapped: list[tuple[tk.Misc, int]] = []
+    self._sliders: list[tuple[tk.Scale, int, int]] = []
     self._render_every = RENDER_EVERY_MIN
     self._next_tick = time.perf_counter()
     self._status_text = "Bereit. Die Simulation läuft; für die echte Hardware oben einen Port wählen."
@@ -94,6 +106,11 @@ class SpirobApp(tk.Tk):
     self.bind("<space>", lambda _e: self._toggle_emergency_stop())
     self.bind("<Escape>", lambda _e: self._emergency_stop())
     self.bind("<F5>", lambda _e: self._reset_simulation())
+    for sequence in ("<Control-plus>", "<Control-equal>", "<Control-KP_Add>"):
+      self.bind(sequence, lambda _e: self._change_scale(UI_SCALE_STEP))
+    for sequence in ("<Control-minus>", "<Control-KP_Subtract>"):
+      self.bind(sequence, lambda _e: self._change_scale(-UI_SCALE_STEP))
+    self.bind("<Control-0>", lambda _e: self._reset_scale())
 
     self.after(0, self._loop)
 
@@ -121,6 +138,7 @@ class SpirobApp(tk.Tk):
     self._build_telemetry(right)
 
     self._build_statusbar()
+    self._collect_scalable_widgets(self)
 
   def _scrollable_sidebar(self) -> ttk.Frame:
     """Seitenleiste, die bei kleinen Bildschirmen scrollt.
@@ -135,8 +153,10 @@ class SpirobApp(tk.Tk):
     holder.columnconfigure(0, weight=1)
     holder.rowconfigure(0, weight=1)
 
-    canvas = tk.Canvas(holder, background=theme.PANEL, highlightthickness=0, bd=0, width=404)
+    canvas = tk.Canvas(holder, background=theme.PANEL, highlightthickness=0, bd=0,
+                       width=SIDEBAR_BASE_WIDTH - 36)
     canvas.grid(row=0, column=0, sticky="nsew")
+    self.sidebar_canvas = canvas
     scrollbar = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
     scrollbar.grid(row=0, column=1, sticky="ns")
     canvas.configure(yscrollcommand=scrollbar.set)
@@ -160,6 +180,57 @@ class SpirobApp(tk.Tk):
                                        for seq in ("<MouseWheel>", "<Button-4>", "<Button-5>")])
     return inner
 
+  def _collect_scalable_widgets(self, parent: tk.Misc) -> None:
+    """Alles einsammeln, was nicht schon über die Schriftgröße mitwächst.
+
+    Umbruchbreiten und die Maße der klassischen Schieberegler sind in Bildpunkten
+    angegeben; ohne diese Liste bliebe der Text bei größerer Schrift im
+    Umbruch stecken und die Regler blieben dünn.
+    """
+    for child in parent.winfo_children():
+      try:
+        wrap = int(child.cget("wraplength"))
+        if wrap:
+          self._wrapped.append((child, wrap))
+      except Exception:
+        pass
+      # ttk.Scale erbt von tk.Scale, kennt aber weder -width noch -sliderlength;
+      # unterschieden wird deshalb über die Tk-Klasse, nicht über isinstance.
+      if child.winfo_class() == "Scale":
+        self._sliders.append((child, int(child.cget("width")), int(child.cget("sliderlength"))))
+      self._collect_scalable_widgets(child)
+
+  def _stop_button_text(self) -> str:
+    """Beschriftung des Not-Aus - mit Tastenhinweis, solange er danebenpasst."""
+    if self.controller.state.emergency_stop:
+      return "Not-Aus aufheben"
+    return "NOT-AUS  (Leertaste)" if self._ui_scale <= 1.1 else "NOT-AUS"
+
+  def _apply_scale(self, factor: float) -> None:
+    """Schriften, Umbrüche, Regler und die Breite der Seitenleiste anpassen."""
+    factor = round(min(UI_SCALE_MAX, max(UI_SCALE_MIN, factor)), 2)
+    self._ui_scale = factor
+    theme.apply_scale(factor)
+    for widget, base in self._wrapped:
+      widget.configure(wraplength=round(base * factor))
+    for slider, width, length in self._sliders:
+      slider.configure(width=round(width * factor), sliderlength=round(length * factor))
+    self.columnconfigure(0, minsize=round(SIDEBAR_BASE_WIDTH * factor))
+    self.sidebar_canvas.configure(width=round((SIDEBAR_BASE_WIDTH - 36) * factor))
+    for column, minsize in enumerate(TELEMETRY_COLUMNS):
+      self.telemetry_card.columnconfigure(column, minsize=round(minsize * factor))
+    self.btn_scale.configure(text=f"{factor * 100:.0f} %")
+    self.btn_stop.configure(text=self._stop_button_text())
+
+  def _change_scale(self, delta: float) -> None:
+    self._apply_scale(self._ui_scale + delta)
+    self._set_status(f"Bedienelemente auf {self._ui_scale * 100:.0f} % - "
+                     "Strg und 0 stellt die Originalgröße wieder her.")
+
+  def _reset_scale(self) -> None:
+    self._apply_scale(1.0)
+    self._set_status("Bedienelemente auf Originalgröße.")
+
   def _build_header(self) -> None:
     header = ttk.Frame(self, style="Header.TFrame", padding=(16, 12))
     header.grid(row=0, column=0, columnspan=2, sticky="ew")
@@ -180,9 +251,23 @@ class SpirobApp(tk.Tk):
     # Der Not-Aus gehört in die Kopfzeile und nicht in die Seitenleiste: er muss
     # sichtbar und klickbar sein, egal wohin die Seitenleiste gerade gescrollt
     # ist und wie klein das Fenster gezogen wurde.
-    self.btn_stop = ttk.Button(header, text="NOT-AUS  (Leertaste)", style="Stop.TButton",
+    # Größe der Bedienelemente: kleiner, zurücksetzen, größer.
+    zoom = ttk.Frame(header, style="Header.TFrame")
+    zoom.grid(row=0, column=3, rowspan=2, sticky="e", padx=(0, 12))
+    for text, command, hint in (
+      ("A−", lambda: self._change_scale(-UI_SCALE_STEP), "kleiner (Strg und −)"),
+      ("100 %", self._reset_scale, "Originalgröße (Strg und 0)"),
+      ("A+", lambda: self._change_scale(UI_SCALE_STEP), "größer (Strg und +)"),
+    ):
+      button = ttk.Button(zoom, text=text, width=6, command=command)
+      button.pack(side="left", padx=1)
+      if text == "100 %":
+        self.btn_scale = button
+      button.bind("<Enter>", lambda _e, h=hint: self._set_status(f"Bedienelemente {h}"))
+
+    self.btn_stop = ttk.Button(header, text=self._stop_button_text(), style="Stop.TButton",
                                command=self._toggle_emergency_stop)
-    self.btn_stop.grid(row=0, column=3, rowspan=2, sticky="e")
+    self.btn_stop.grid(row=0, column=4, rowspan=2, sticky="e")
 
   # -- Verbindung ------------------------------------------------------------
 
@@ -383,9 +468,9 @@ class SpirobApp(tk.Tk):
     self.lbl_limit.grid(row=0, column=1, sticky="e")
 
     self.var_limit = tk.DoubleVar(value=FORCE_LIMIT_N)
-    ttk.Scale(card, from_=0.0, to=FORCE_LIMIT_N, orient="horizontal", variable=self.var_limit,
-              command=lambda _v: self._on_limit_change()).grid(row=2, column=0, sticky="ew",
-                                                               pady=(2, 6))
+    self._slider(card, self.var_limit, 0.0, FORCE_LIMIT_N, 1.0,
+                 lambda _v: self._on_limit_change()).grid(row=2, column=0, sticky="ew",
+                                                          pady=(2, 6))
     ttk.Label(card, text="Obergrenze für jede Seilkraft - wirkt in beiden Betriebsarten "
                         "und auch auf das, was an die Hardware geht.",
               style="Muted.TLabel", wraplength=340, justify="left").grid(row=3, column=0, sticky="w")
@@ -415,12 +500,11 @@ class SpirobApp(tk.Tk):
   def _build_telemetry(self, parent: ttk.Frame) -> None:
     card = theme.card(parent, "Telemetrie")
     card.grid(row=1, column=0, sticky="ew")
+    self.telemetry_card = card
     # Beschriftungen bekommen festen Platz, die Werte den Rest - sonst kürzt Tk
     # bei schmalem Fenster genau die Beschriftungen weg.
-    card.columnconfigure(0, weight=0, minsize=150)
-    card.columnconfigure(1, weight=1, minsize=110)
-    card.columnconfigure(2, weight=0, minsize=150)
-    card.columnconfigure(3, weight=1, minsize=110)
+    for column, minsize in enumerate(TELEMETRY_COLUMNS):
+      card.columnconfigure(column, weight=column % 2, minsize=minsize)
 
     self.tele: dict[str, ttk.Label] = {}
     rows = [
@@ -471,6 +555,7 @@ class SpirobApp(tk.Tk):
       self._load_policy()
     self.var_limit.set(float(self.settings["force_limit_n"]))
     self._on_limit_change()
+    self._apply_scale(float(self.settings["ui_scale"]))
     self.var_view.set(self.settings["view_mode"])
     self._on_view_change()
     self._on_target_change()
@@ -483,6 +568,7 @@ class SpirobApp(tk.Tk):
       "sensor_flip": bool(self.var_sensor_flip.get()),
       "policy": info.path.name if info else "",
       "view_mode": self.var_view.get(),
+      "ui_scale": self._ui_scale,
       "force_limit_n": float(self.var_limit.get()),
       "send_to_hardware": bool(self.var_send_hw.get()),
     }
@@ -557,23 +643,13 @@ class SpirobApp(tk.Tk):
     self._update_sensor_widgets()
 
   def _update_sensor_widgets(self) -> None:
+    # Die Anbindung weiß selbst am besten, woran es gerade hakt - kein Port,
+    # falsche Baudrate, ein fehlender Sensor oder ein stehender Datenstrom.
     sensors = self.controller.sensors
-    if not sensors.connected:
-      self.lbl_sensor.configure(
-        text=f"Nicht verbunden ({sensors.last_error})." if sensors.last_error
-        else "Sensorplatine nicht verbunden - die Anzeige zeigt die Simulation.")
-      return
-    if not sensors.has_data:
-      # Verbunden, aber es kommt nichts: das ist ein anderer Fehler als "kein
-      # Port", und die Meldung muss das unterscheiden.
-      self.lbl_sensor.configure(
-        text=f"{sensors.port}: verbunden, aber keine Frames. Verkabelung und "
-             "Firmware der Platine prüfen.")
-      return
-    angles = sensors.angles_deg()
     self.lbl_sensor.configure(
-      text=f"{sensors.port}: {sensors.frames} Frames, Winkel "
-           f"{angles.min():+.0f}° bis {angles.max():+.0f}°.")
+      text=sensors.status_text(),
+      foreground=theme.MUTED if sensors.has_data or not sensors.connected else theme.WARN,
+    )
 
   def _on_use_sensors_toggle(self) -> None:
     """Sensorplatine ein- oder ausschalten.
@@ -604,11 +680,15 @@ class SpirobApp(tk.Tk):
       return
 
     self.controller.sensors.sign = -1.0 if self.var_sensor_flip.get() else 1.0
+    # Das Suchen der Baudrate dauert im schlechtesten Fall gut eine Sekunde, in
+    # der das Fenster steht. Deshalb vorher sagen, was passiert.
+    self._set_status(f"Suche die Sensorplatine an {port} ...")
+    self.update_idletasks()
     if self.controller.sensors.connect(port):
       self.controller.state.use_sensors = True
       self._set_status(
-        f"Sensorplatine an {port} verbunden. Anzeige und Policy können jetzt die "
-        "gemessenen Gelenkwinkel nutzen.")
+        f"Sensorplatine an {port} verbunden ({self.controller.sensors.baudrate} Baud). "
+        "Anzeige und Policy können jetzt die gemessenen Gelenkwinkel nutzen.")
     else:
       self.var_use_sensors.set(False)
       self.controller.state.use_sensors = False
@@ -745,7 +825,7 @@ class SpirobApp(tk.Tk):
   def _toggle_emergency_stop(self) -> None:
     if self.controller.state.emergency_stop:
       self.controller.release_emergency_stop()
-      self.btn_stop.configure(text="NOT-AUS  (Leertaste)")
+      self.btn_stop.configure(text=self._stop_button_text())
     else:
       self._emergency_stop()
 
@@ -754,7 +834,7 @@ class SpirobApp(tk.Tk):
     self.var_f0.set(0.0)
     self.var_f1.set(0.0)
     self._update_force_labels()
-    self.btn_stop.configure(text="Not-Aus aufheben")
+    self.btn_stop.configure(text=self._stop_button_text())
 
   # -- Ansicht ---------------------------------------------------------------
 

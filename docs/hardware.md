@@ -20,8 +20,15 @@ flowchart LR
     A["Sensorplatine<br/>14 Beschleunigungssensoren"] -- "Beschleunigungen<br/>je Segment" --> G
 ```
 
-Verbindung: USB, **460800 Baud** zum Motorcontroller, **1 MBaud** zur
+Verbindung: USB, **460800 Baud** zum Motorcontroller, **500000 Baud** zur
 Sensorplatine, jeweils 8N1.
+
+!!! note "Warum 500000 und nicht 1 MBaud?"
+    Im Frame-Parser des Trainingsprojekts steht 1 MBaud, gearbeitet wird aber
+    mit 500000 – das ist der Wert, den die dort verwendete
+    Kommandozeilen-Brücke voreinstellt und mit dem die Platine nachweislich
+    läuft. Damit man das nicht wissen muss, probiert die Oberfläche beim
+    Verbinden beide Raten durch und behält die, auf der Frames ankommen.
 
 ## Protokoll
 
@@ -121,6 +128,9 @@ je Sensor:   sensor_id(u8) + 3 float32   (Modus ACC)
 
 Beim Verbinden schickt die GUI ein `a` und stellt die Platine damit auf reine
 Beschleunigungsdaten - die höchste Bildrate, und mehr wird nicht gebraucht.
+Als „verbunden“ gilt die Platine erst, wenn tatsächlich Frames ankommen: Ein
+offener Port, auf dem nur Rauschen liegt, wäre die verwirrendste aller
+Antworten - die Verbindung sähe gut aus und die Anzeige bliebe trotzdem leer.
 Wie beim Motorcontroller wird je Takt der Puffer geleert und nur der jüngste
 vollständige Frame ausgewertet. Ein Frame, der von keinem weiteren Kopf gefolgt
 wird, gilt als Fehltreffer und wird verworfen; das fängt verlorene Bytes ab,
@@ -143,6 +153,18 @@ gefährlichere Antwort.
    **falschen** Seite, **„Winkel spiegeln“** anhaken - ob eine Biegung positive
    oder negative Winkel liefert, hängt daran, wie herum die Platine montiert
    ist, und das kann die Software nicht wissen.
+
+### Wenn es nicht geht
+
+Die Zeile unter dem Haken sagt, woran es liegt - die drei Fälle brauchen
+unterschiedliche Handgriffe:
+
+| Meldung | Ursache |
+| ------- | ------- |
+| „keine Daten“ | Falscher Port, Kabel oder Stromversorgung der Platine. |
+| „Daten, aber keine gültigen Frames“ | Die Baudrate passt nicht (beide Kandidaten wurden probiert) oder die Firmware sendet ein anderes Format. |
+| „die Sensoren [...] fehlen“ | Frames kommen an, aber einzelne Sensoren melden sich nicht – Verkabelung dieser Sensoren prüfen. Solange gibt es bewusst gar keine Winkel statt Winkel mit einem Loch darin. |
+| „Datenstrom steht seit über einer Sekunde“ | Die Verbindung lebt, die Platine sendet aber nicht mehr. |
 
 !!! note "Die Reihenfolge der Sensoren"
     Voreingestellt ist die Zuordnung `0,1,…,7,32,…,37` von der Basis zur

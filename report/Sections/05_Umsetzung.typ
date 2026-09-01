@@ -76,8 +76,8 @@ erscheint als Meldung in der Statuszeile, während die Simulation weiterläuft.
 
 == Die Sensorplatine
 
-Die zweite Quelle hängt an einem eigenen USB-Port und sendet mit 1 MBaud einen
-Binärstrom aus Frames: pro Frame ein Kopf und danach je Sensor eine Kennung und
+Die zweite Quelle hängt an einem eigenen USB-Port und sendet mit 500000 Baud
+einen Binärstrom aus Frames: pro Frame ein Kopf und danach je Sensor eine Kennung und
 drei Fließkommazahlen. Der Parser sucht den Kopf, prüft Modus und Sensoranzahl
 auf Plausibilität und verlangt, dass unmittelbar hinter einem Frame der nächste
 Kopf steht - ohne diese letzte Prüfung wäre jede Bytefolge, die zufällig wie ein
@@ -90,6 +90,18 @@ geglättet, in die physische Reihenfolge gebracht, auf Länge eins normiert und
 mindestens einmal gesehen wurde, gibt es gar keine Winkel: Ein Vektor mit einem
 Loch darin wäre schlimmer als keiner. Die Geschwindigkeiten entstehen aus einer
 gefilterten Differenzierung, wie beim Motorcontroller auch.
+
+Die Baudrate war dabei die erste Fehlerquelle im Betrieb: Im Frame-Parser des
+Trainingsprojekts steht 1 MBaud, tatsächlich arbeitet die Platine mit 500000 -
+dem Wert, den die dortige Kommandozeilen-Brücke voreinstellt. Mit der falschen
+Rate ließ sich der Port anstandslos öffnen, es kamen nur nie Frames an. Daraus
+folgten zwei Änderungen. Erstens probiert die Verbindung beide Raten durch und
+behält die, auf der Frames ankommen. Zweitens gilt eine Verbindung erst dann als
+hergestellt, wenn tatsächlich Frames eintreffen - ein offener Port ohne Daten
+ist die verwirrendste aller Antworten, weil alles richtig aussieht und die
+Anzeige trotzdem leer bleibt. Kommt nichts an, nennt die Oberfläche den
+Unterschied zwischen "gar keine Daten" (Port oder Stromversorgung), "Daten ohne
+gültige Frames" (Baudrate) und "einzelne Sensoren fehlen" (Verkabelung).
 
 Zwei Dinge kann die Software nicht selbst wissen, weil sie vom Einbau abhängen:
 die Zuordnung der Sensorkennungen zu den Segmenten und das Vorzeichen der
@@ -158,6 +170,19 @@ statt die Simulation als Messung auszugeben.
   caption: [Die Schema-Ansicht zeigt zusätzlich den trainierten Arbeitsraum als Band und erlaubt, das Ziel per Klick zu setzen. Sie kommt ohne Grafikbeschleunigung aus.],
 ) <fig:gui-schema>
 
+== Größe der Bedienelemente
+
+Die Oberfläche lässt sich von 70 % bis 180 % stufenlos vergrößern, über drei
+Knöpfe in der Kopfzeile oder mit #raw("Strg") und #raw("+") / #raw("-") /
+#raw("0"). Skaliert werden dabei nicht nur die Schriften: Die ttk-Stile
+verweisen auf dieselben Schriftobjekte, deshalb genügt für sie eine Änderung der
+Größe, aber Umbruchbreiten, die Maße der Schieberegler, die Spaltenbreiten der
+Telemetrie und die Breite der Seitenleiste sind in Bildpunkten angegeben und
+müssen einzeln mitgeführt werden. Sie werden nach dem Aufbau des Fensters
+einmal eingesammelt, indem der Widget-Baum durchlaufen wird - so muss keine
+neue Beschriftung daran denken, sich anzumelden. Der gewählte Faktor wird
+gespeichert und beim nächsten Start wiederhergestellt.
+
 == Windows-Tauglichkeit
 
 Da die Anwendung ausdrücklich unter Windows laufen soll, wurden einige
@@ -171,7 +196,7 @@ pySerial und Pillow - Tkinter gehört zur Standardinstallation von Python.
 
 == Tests
 
-Die Testsuite umfasst 51 Tests und läuft in wenigen Sekunden. Geprüft werden
+Die Testsuite umfasst 54 Tests und läuft in wenigen Sekunden. Geprüft werden
 das Layout jeder Policy gegen ihr Netz, die
 Vollständigkeit der von der Simulation gelieferten Signale, das Auffüllen der
 Historie beim ersten Takt, die Aktionsgrenze, die Kraftabbildung an ihren

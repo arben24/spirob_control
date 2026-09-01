@@ -107,8 +107,11 @@ Policy im Training gesehen hat.
 1. Die Platine an einen **zweiten** USB-Port stecken und unter „Sensorplatine
    (zweiter Port)“ auswählen.
 2. **„Sensordaten verwenden“** anhaken – der Haken ist zugleich der
-   Verbindungsschalter. Darunter stehen dann die Anzahl der empfangenen Frames
-   und der Bereich der gemessenen Winkel.
+   Verbindungsschalter. Darunter stehen dann Port, erkannte Baudrate, die
+   Anzahl der empfangenen Frames und der Bereich der gemessenen Winkel. Kommen
+   keine Frames an, nennt dieselbe Zeile den Grund (siehe
+   [Hardware](hardware.md), Abschnitt „Wenn es nicht geht“); der Haken geht
+   dann von selbst wieder heraus.
 3. Den Arm ein Stück von Hand biegen und prüfen, ob die grüne Linie im Schema
    der wirklichen Bewegung folgt. Geht sie zur falschen Seite: **„Winkel
    spiegeln“** anhaken.
@@ -145,11 +148,25 @@ gefährlichere Antwort.
 
 ## Tastenkürzel
 
-| Taste        | Wirkung                          |
-| ------------ | -------------------------------- |
-| `Leertaste`  | Not-Aus auslösen bzw. aufheben    |
-| `Esc`        | Not-Aus auslösen                  |
-| `F5`         | simulierten Arm zurücksetzen      |
+| Taste            | Wirkung                                    |
+| ---------------- | ------------------------------------------ |
+| `Leertaste`      | Not-Aus auslösen bzw. aufheben              |
+| `Esc`            | Not-Aus auslösen                            |
+| `F5`             | simulierten Arm zurücksetzen                |
+| `Strg` und `+`   | Bedienelemente vergrößern                   |
+| `Strg` und `−`   | Bedienelemente verkleinern                  |
+| `Strg` und `0`   | zurück auf Originalgröße                    |
+
+## Größe der Bedienelemente
+
+Oben rechts stehen drei Knöpfe: **A−**, der aktuelle Faktor und **A+**. Sie
+vergrößern Schrift, Schieberegler, Textumbrüche und die Breite der Seitenleiste
+gemeinsam, von 70 % bis 180 % – nützlich für Vorführungen am Beamer oder auf
+einem hochauflösenden Bildschirm, auf dem alles zu klein gerät. Der Faktor wird
+gemerkt und beim nächsten Start wiederhergestellt.
+
+Die Ansicht des Roboters skaliert davon unabhängig immer auf die volle
+verfügbare Fläche.
 
 ## Telemetrie
 

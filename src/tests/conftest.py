@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import struct
+import threading
 import time
 
 import numpy as np
@@ -61,7 +62,11 @@ def make_frame():
 def sensor_link():
   """``make(winkel)`` liefert eine verbundene Platine, die diese Winkel meldet.
 
-  Die Ports werden am Ende des Tests zuverlässig wieder geschlossen.
+  Ein Hintergrund-Thread schreibt fortlaufend Frames auf das virtuelle
+  Terminal - so wie es die echte Platine tut, die von sich aus sendet. Das ist
+  nicht nur bequemer als einmaliges Schreiben: ``connect()`` gilt erst als
+  erfolgreich, wenn tatsächlich Frames ankommen, und genau dieses Verhalten
+  soll der Test mitprüfen.
   """
   if not HAS_PTY:
     pytest.skip("Virtuelles Terminal nur unter POSIX verfügbar")
@@ -70,28 +75,46 @@ def sensor_link():
 
   def make(angles):
     master, slave = os.openpty()
+    state = {"angles": np.asarray(angles, dtype=float), "id": 1}
+    stop = threading.Event()
+
+    def writer() -> None:
+      while not stop.is_set():
+        pitch = kinematics.segment_pitch(state["angles"])
+        try:
+          os.write(
+            master,
+            build_frame(pitch, state["id"]) + build_frame(pitch, state["id"] + 1)
+            + sensors.FRAME_HEADER,
+          )
+        except OSError:
+          return
+        state["id"] += 2
+        time.sleep(0.02)
+
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+
     link = sensors.JointSensorLink()
-    assert link.connect(os.ttyname(slave)), link.last_error
-    opened.append((link, master, slave))
-    feed(link, master, angles, first_id=1)
+    ok = link.connect(os.ttyname(slave))
+    opened.append((link, master, slave, stop, thread))
+    assert ok, link.last_error
     return link, master
 
-  def feed(link, master, angles, first_id: int) -> None:
-    """Frames schreiben und warten, bis die Anbindung sie verarbeitet hat.
+  def feed(link, master, angles, first_id: int = 0) -> None:
+    """Andere Winkel senden und warten, bis die Anbindung sie verarbeitet hat.
 
-    Gewartet wird auf den Frame-Zähler, nicht auf ``has_data``: Nach dem ersten
-    Frame steht der schon auf True, und ein zu früher Abbruch würde die neuen
+    Gewartet wird auf den Frame-Zähler, nicht auf ``has_data``: Der steht nach
+    dem Verbinden schon auf True, und ein zu früher Abbruch würde die neuen
     Winkel gar nicht mehr einlesen.
     """
+    for link_, master_, _slave, _stop, _thread in opened:
+      if link_ is link:
+        break
     before = link.frames
-    pitch = kinematics.segment_pitch(angles)
-    os.write(
-      master,
-      build_frame(pitch, first_id) + build_frame(pitch, first_id + 1) + sensors.FRAME_HEADER,
-    )
-    for _ in range(100):
+    for _ in range(200):
       link.poll()
-      if link.frames > before:
+      if link.frames > before + 2:
         return
       time.sleep(0.002)
     raise AssertionError("Die Sensoranbindung hat die Testframes nicht gelesen.")
@@ -99,7 +122,9 @@ def sensor_link():
   make.feed = feed
   yield make
 
-  for link, master, slave in opened:
+  for link, master, slave, stop, thread in opened:
+    stop.set()
+    thread.join(timeout=1.0)
     link.disconnect()
     os.close(master)
     os.close(slave)

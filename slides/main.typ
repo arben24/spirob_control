@@ -172,7 +172,7 @@ rechnet das Netz weiter - der Arm bewegt sich einfach falsch.
     - Zwei Betriebsarten in einer Oberfläche
     - Vier Policies ohne Trainingsstack nutzbar
     - Sensorplatine eingebunden: alle vier Level auch auf der Hardware
-    - Stabile 50 Hz, 51 automatisierte Tests
+    - Stabile 50 Hz, 54 automatisierte Tests
     - `git clone` + Doppelklick unter Windows
   ],
   [

@@ -20,6 +20,7 @@ DEFAULTS: dict = {
   "sensor_flip": False,
   "policy": "reach_tendon.npz",
   "view_mode": "3d",
+  "ui_scale": 1.0,
   "force_limit_n": 150.0,
   "send_to_hardware": False,
 }

@@ -190,3 +190,35 @@ def test_haken_geht_bei_falschem_port_wieder_heraus(app, monkeypatch):
   app._on_use_sensors_toggle()
   assert app.var_use_sensors.get() is False
   assert app.controller.state.use_sensors is False
+
+
+def test_bedienelemente_lassen_sich_vergroessern(app):
+  """Die Oberfläche muss sich für Vorführungen größer stellen lassen."""
+  from spirob_control import theme
+  from spirob_control.app import UI_SCALE_MAX, UI_SCALE_MIN
+
+  base_size = int(app.fonts["body"].cget("size"))
+  base_wrap = [int(widget.cget("wraplength")) for widget, _ in app._wrapped]
+
+  app._change_scale(0.3)
+  pump(app, 0.1)
+  assert app._ui_scale == pytest.approx(1.3)
+  assert int(app.fonts["body"].cget("size")) > base_size
+  assert theme.SCALE == pytest.approx(1.3)
+  # Umbruchbreiten und Regler wachsen mit, sonst bliebe der Text stecken.
+  assert all(int(w.cget("wraplength")) > b for (w, _), b in zip(app._wrapped, base_wrap))
+  assert all(int(s.cget("width")) >= w for s, w, _ in app._sliders)
+
+  app._reset_scale()
+  pump(app, 0.1)
+  assert app._ui_scale == pytest.approx(1.0)
+  assert int(app.fonts["body"].cget("size")) == base_size
+  assert [int(w.cget("wraplength")) for w, _ in app._wrapped] == base_wrap
+
+  # Die Grenzen halten, egal wie oft geklickt wird.
+  for _ in range(30):
+    app._change_scale(0.1)
+  assert app._ui_scale == pytest.approx(UI_SCALE_MAX)
+  for _ in range(30):
+    app._change_scale(-0.1)
+  assert app._ui_scale == pytest.approx(UI_SCALE_MIN)

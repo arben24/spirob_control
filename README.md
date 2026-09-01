@@ -48,7 +48,8 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
 - Die im Training gelernten Policies nutzbar machen, ohne die komplette
   Trainingsumgebung mitzuschleppen.
 - Simulation und Hardware in **einer** Oberfläche, mit klarer Anzeige, welche
-  von beiden gerade Kräfte bekommt.
+  von beiden gerade Kräfte bekommt - und in einer Größe, die sich für
+  Vorführungen hochstellen lässt.
 - Die vorhandene Sensorik einbinden, sodass die Anzeige den echten Arm zeigt
   und jede trainierte Policy auch auf gemessenen Daten laufen kann.
 - Lauffähig auf einem frisch aufgesetzten Windows-Rechner: klonen,
@@ -71,7 +72,7 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
   auswählbar. Ihre Zielabweichung im Nachbau stimmt mit den Messwerten am Ende
   des Trainings überein (z. B. `joints` 42 mm) – der Export und der Nachbau der
   Beobachtung sind damit nachweislich korrekt.
-- 51 automatisierte Tests sichern die kritischen Nahtstellen ab: das
+- 54 automatisierte Tests sichern die kritischen Nahtstellen ab: das
   Beobachtungslayout, die Kraftabbildung, ein vollständiger Rollout bis ans
   Ziel und - über ein virtuelles Terminalpaar - der komplette Weg von den Bytes
   der Sensorplatine bis zum Gelenkwinkel.

@@ -288,11 +288,11 @@ class RobotView(ttk.Frame):
       )
     self.canvas.create_text(
       14, height - 14, anchor="sw", justify="left", text="\n".join(lines),
-      fill=theme.TEXT, font=("TkFixedFont", 9),
+      fill=theme.TEXT, font=theme.canvas_font(9),
     )
     self.canvas.create_text(
       width - 14, 14, anchor="ne", text="Ziehen: drehen   Rad: zoomen",
-      fill=theme.MUTED, font=("TkFixedFont", 8),
+      fill=theme.MUTED, font=theme.canvas_font(8),
     )
 
   # -- Schema ----------------------------------------------------------------
@@ -326,7 +326,7 @@ class RobotView(ttk.Frame):
     canvas.create_line(16, height - 18, 16 + 0.1 * scale, height - 18,
                        fill=theme.MUTED, width=2)
     canvas.create_text(16, height - 26, anchor="sw", text="100 mm",
-                       fill=theme.MUTED, font=("TkFixedFont", 8))
+                       fill=theme.MUTED, font=theme.canvas_font(8))
 
     # Die Kette. Mit Sensorplatine ist die gemessene Form die Hauptaussage und
     # die Simulation nur noch der blasse Vergleich dahinter - der Abstand
@@ -364,7 +364,7 @@ class RobotView(ttk.Frame):
         f"   Abstand {telemetry.measured_error_m * 1000:4.0f} mm"
       )
     canvas.create_text(
-      14, 14, anchor="nw", justify="left", fill=theme.MUTED, font=("TkFixedFont", 9),
+      14, 14, anchor="nw", justify="left", fill=theme.MUTED, font=theme.canvas_font(9),
       text="\n".join(lines),
     )
 
@@ -373,7 +373,7 @@ class RobotView(ttk.Frame):
 
     if self.on_pick is not None:
       canvas.create_text(width - 14, height - 14, anchor="se", text="Klick setzt das Ziel",
-                         fill=theme.MUTED, font=("TkFixedFont", 8))
+                         fill=theme.MUTED, font=theme.canvas_font(8))
 
     # Kraftbalken je Seil, damit man die Stellgröße auch im Schema sieht.
     self._draw_force_bars(telemetry, width, height)
@@ -411,7 +411,7 @@ class RobotView(ttk.Frame):
       canvas.create_line(14, y, 36, y, fill=color, width=4 if dash is None else 2,
                          dash=dash, capstyle="round")
       canvas.create_text(42, y, anchor="w", text=label, fill=fill,
-                         font=("TkFixedFont", 8))
+                         font=theme.canvas_font(8))
 
   def _draw_force_bars(self, telemetry, width: int, height: int) -> None:
     canvas = self.canvas
@@ -425,9 +425,9 @@ class RobotView(ttk.Frame):
       canvas.create_rectangle(x, top + bar_height - filled, x + 12, top + bar_height,
                               outline="", fill=theme.TENDON_COLORS[i])
       canvas.create_text(x + 6, top + bar_height + 12, text=f"{force:.0f}",
-                         fill=theme.MUTED, font=("TkFixedFont", 8))
+                         fill=theme.MUTED, font=theme.canvas_font(8))
     canvas.create_text(width - 14, top - 6, text="Seilkraft [N]", anchor="se",
-                       fill=theme.MUTED, font=("TkFixedFont", 8))
+                       fill=theme.MUTED, font=theme.canvas_font(8))
 
   # -- Aufräumen -------------------------------------------------------------
 
