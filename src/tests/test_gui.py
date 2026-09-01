@@ -111,3 +111,39 @@ def test_policy_ohne_sensordaten_faellt_zurueck(app):
   assert app.controller.state.mode == "manual"
   assert app.controller.telemetry.forces_n.tolist() == [0.0, 0.0]
   assert app.notebook.index("current") == 0
+
+
+def test_3d_ansicht_fuellt_die_flaeche(app):
+  """Die 3D-Ansicht muss beim Vergrößern des Fensters mitwachsen.
+
+  Sie hing früher an einer festen Obergrenze und stand dann klein in der Mitte,
+  sobald man das Fenster maximiert hat - im Vollbild der auffälligste Fehler,
+  den die Oberfläche hatte.
+  """
+  app.var_view.set("3d")
+  app._on_view_change()
+  pump(app, 0.8)
+  if app.view._render_failed or app.view._photo is None:
+    pytest.skip("Auf diesem Rechner ist kein 3D-Rendering verfügbar")
+
+  for geometry in ("1500x950+20+20", "1100x700+20+20"):
+    app.geometry(geometry)
+    pump(app, 1.2)
+    canvas = (app.view.canvas.winfo_width(), app.view.canvas.winfo_height())
+    assert (app.view._photo.width(), app.view._photo.height()) == canvas, (
+      f"Bild {app.view._photo.width()}x{app.view._photo.height()} passt nicht zur "
+      f"Zeichenfläche {canvas[0]}x{canvas[1]}"
+    )
+
+
+def test_regeltakt_bleibt_trotz_grossem_fenster(app):
+  """Ein großes Fenster darf die Bildrate drücken, aber nicht den Regeltakt."""
+  app.var_view.set("3d")
+  app._on_view_change()
+  app.geometry("1500x950+20+20")
+  pump(app, 1.5)
+  before = app.controller.telemetry.ticks
+  start = time.perf_counter()
+  pump(app, 2.0)
+  rate = (app.controller.telemetry.ticks - before) / (time.perf_counter() - start)
+  assert rate > 40.0, f"Regeltakt auf {rate:.1f} Hz eingebrochen"

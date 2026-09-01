@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import base64
 import math
+import time
 import tkinter as tk
 from tkinter import ttk
 
@@ -31,8 +32,29 @@ try:
 except Exception:  # pragma: no cover - Pillow ist optional
   PIL_AVAILABLE = False
 
-MAX_RENDER_WIDTH = 1280
-MAX_RENDER_HEIGHT = 960
+MAX_RENDER_WIDTH = 3840
+MAX_RENDER_HEIGHT = 2400
+"""Obergrenze der Renderauflösung.
+
+Groß genug, dass auch ein 4K-Vollbild in Originalauflösung gerendert wird - das
+ist der schnellste Fall, weil dann gar nicht skaliert werden muss. Erst
+darüber (etwa auf einem virtuellen Bildschirm über mehrere Monitore) rendert
+die Ansicht seitenverhältnisgetreu kleiner und skaliert das Bild auf die
+Zeichenfläche hoch, statt es klein in der Mitte stehen zu lassen. Dass dabei
+der Regeltakt nicht leidet, sorgt die Bildrate in ``app.py``: sie richtet sich
+danach, wie lange ein Bild tatsächlich dauert.
+"""
+
+FALLBACK_RENDER_SIZE = (1280, 800)
+"""Zweiter Versuch, falls die Grafikkarte den gewünschten Puffer verweigert."""
+
+RESIZE_DEBOUNCE_S = 0.2
+"""Mindestabstand zwischen zwei Neuanlagen des Renderers.
+
+Beim Ziehen am Fensterrand ändert sich die Größe viele Male je Sekunde. Für
+jede davon einen neuen OpenGL-Kontext anzulegen wäre teuer; in der Zwischenzeit
+wird das zuletzt gerenderte Format hochskaliert angezeigt.
+"""
 
 
 class RobotView(ttk.Frame):
@@ -55,6 +77,7 @@ class RobotView(ttk.Frame):
     self._camera = None
     self._drag_origin: tuple[int, int] | None = None
     self._render_failed = False
+    self._last_resize = 0.0
     self._transform: tuple[float, float, float] | None = None  # (x0, y0, Maßstab)
 
     self.canvas.bind("<ButtonPress-1>", self._on_press)
@@ -131,26 +154,56 @@ class RobotView(ttk.Frame):
 
   # -- 3D --------------------------------------------------------------------
 
+  @staticmethod
+  def _render_size_for(width: int, height: int) -> tuple[int, int]:
+    """Renderformat für eine Zeichenfläche dieser Größe.
+
+    Normalfall: genau die Größe der Zeichenfläche, also ein Bild ohne
+    Skalierung und im richtigen Seitenverhältnis. Erst jenseits der Obergrenze
+    wird proportional verkleinert - das Seitenverhältnis bleibt dabei erhalten,
+    sonst wäre das hochskalierte Bild verzerrt.
+    """
+    scale = min(1.0, MAX_RENDER_WIDTH / width, MAX_RENDER_HEIGHT / height)
+    return (max(64, int(width * scale)), max(64, int(height * scale)))
+
+  def _build_renderer(self, size: tuple[int, int]):
+    """Renderer für dieses Format anlegen; bei Ablehnung kleiner erneut versuchen."""
+    import mujoco
+
+    if self._renderer is not None:
+      self._renderer.close()
+      self._renderer = None
+    for candidate in (size, FALLBACK_RENDER_SIZE):
+      # Der Offscreen-Puffer ist im Modell auf 640x480 vorbelegt und muss vor
+      # dem Anlegen des Renderers groß genug sein.
+      self.sim.model.vis.global_.offwidth = max(self.sim.model.vis.global_.offwidth, candidate[0])
+      self.sim.model.vis.global_.offheight = max(self.sim.model.vis.global_.offheight, candidate[1])
+      try:
+        self._renderer = mujoco.Renderer(self.sim.model, candidate[1], candidate[0])
+        self._render_size = candidate
+        self._last_resize = time.monotonic()
+        return
+      except Exception:
+        if candidate is FALLBACK_RENDER_SIZE:
+          raise  # auch das kleinere Format geht nicht -> Schema-Ansicht
+
   def _draw_3d(self, telemetry, width: int, height: int) -> bool:
     try:
-      import mujoco
-
-      size = (min(width, MAX_RENDER_WIDTH), min(height, MAX_RENDER_HEIGHT))
-      if self._renderer is None or self._render_size != size:
-        if self._renderer is not None:
-          self._renderer.close()
-        # Der Offscreen-Puffer ist im Modell auf 640x480 vorbelegt; für ein
-        # scharfes Bild im großen Fenster wird er vor dem Anlegen erhöht.
-        self.sim.model.vis.global_.offwidth = max(self.sim.model.vis.global_.offwidth, size[0])
-        self.sim.model.vis.global_.offheight = max(self.sim.model.vis.global_.offheight, size[1])
-        self._renderer = mujoco.Renderer(self.sim.model, size[1], size[0])
-        self._render_size = size
+      wanted = self._render_size_for(width, height)
+      if self._renderer is None:
+        self._build_renderer(wanted)
+      elif wanted != self._render_size and time.monotonic() - self._last_resize >= RESIZE_DEBOUNCE_S:
+        # Beim Ziehen am Fensterrand nicht für jede Zwischengröße einen neuen
+        # OpenGL-Kontext anlegen; bis dahin wird hochskaliert angezeigt.
+        self._build_renderer(wanted)
 
       camera = self._ensure_camera()
       self._renderer.update_scene(self.sim.data, camera)
       self._add_target_marker(telemetry)
       frame = self._renderer.render()
-      self._photo = _to_photo_image(frame)
+      # Auf die Zeichenfläche bringen: normalerweise passt das Bild exakt, nur
+      # während einer Größenänderung oder oberhalb der Obergrenze wird skaliert.
+      self._photo = _to_photo_image(frame, (width, height))
       self.canvas.delete("all")
       self.canvas.create_image(width // 2, height // 2, image=self._photo, anchor="center")
       self._draw_hud(telemetry, width, height)
@@ -294,16 +347,20 @@ class RobotView(ttk.Frame):
       self._renderer = None
 
 
-def _to_photo_image(frame: np.ndarray):
-  """RGB-Array in ein Tk-Bild wandeln.
+def _to_photo_image(frame: np.ndarray, display_size: tuple[int, int] | None = None):
+  """RGB-Array in ein Tk-Bild wandeln, bei Bedarf auf ``display_size`` gebracht.
 
-  Mit Pillow ist das ein direkter Weg. Ohne Pillow wird das Bild als PPM
-  aufbereitet und base64-kodiert an Tk übergeben -- langsamer, aber es kommt
-  ohne zusätzliche Abhängigkeit aus, und die GUI läuft damit auch auf einem
-  frisch aufgesetzten Rechner sofort.
+  Mit Pillow ist das ein direkter Weg, und dort kann das Bild auch skaliert
+  werden. Ohne Pillow wird es als PPM aufbereitet und base64-kodiert an Tk
+  übergeben -- langsamer und ohne Skalierung, aber es kommt ohne zusätzliche
+  Abhängigkeit aus, und die GUI läuft damit auch auf einem frisch aufgesetzten
+  Rechner sofort.
   """
-  if PIL_AVAILABLE:
-    return ImageTk.PhotoImage(Image.fromarray(frame))
   height, width = frame.shape[:2]
+  if PIL_AVAILABLE:
+    image = Image.fromarray(frame)
+    if display_size is not None and display_size != (width, height):
+      image = image.resize(display_size, Image.BILINEAR)
+    return ImageTk.PhotoImage(image)
   ppm = b"P6 %d %d 255 " % (width, height) + frame.tobytes()
   return tk.PhotoImage(data=base64.b64encode(ppm))

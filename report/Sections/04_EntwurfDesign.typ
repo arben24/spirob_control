@@ -27,11 +27,14 @@ geordnet.
 
 *Ein Thread statt eines Regelungs-Threads.* Der naheliegende Entwurf trennt
 Regelung und Anzeige in zwei Threads. Eine Abschätzung zeigt jedoch, dass das
-nicht nötig ist: Ein Regelschritt kostet etwa 0,1 ms und ein gerendertes Bild
-rund 4 ms, zusammen also etwa ein Fünftel des 20-ms-Budgets. Der Regelkreis
-hängt deshalb an der Ereignisschleife der Oberfläche. Das erspart Sperren,
-Warteschlangen und jede Form von Wettlauf zwischen Anzeige und Regelung -
-für die geforderte Robustheit (A6) der wirksamste Hebel.
+nicht nötig ist: Ein Regelschritt kostet etwa 0,1 ms und eine Bildausgabe rund
+6 bis 8 ms, zusammen also weniger als die Hälfte des 20-ms-Budgets. Der
+Regelkreis hängt deshalb an der Ereignisschleife der Oberfläche. Das erspart
+Sperren, Warteschlangen und jede Form von Wettlauf zwischen Anzeige und
+Regelung - für die geforderte Robustheit (A6) der wirksamste Hebel. Damit die
+Rechnung auch auf einem sehr großen Bildschirm aufgeht, richtet sich die
+Bildrate nach der gemessenen Zeichendauer: Wird das Zeichnen teuer, wird
+seltener gezeichnet, der Regeltakt bleibt.
 
 *Gewichte statt Laufzeitbibliothek.* Um A3 zu erfüllen, werden die Policies
 einmalig aus dem Trainingsprojekt exportiert: die Gewichte als NumPy-Arrays,

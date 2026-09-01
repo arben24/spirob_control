@@ -70,14 +70,35 @@ Ein Regelschritt - Beobachtung zusammensetzen, Netz auswerten, fünf
 Simulationsschritte rechnen - kostet im Mittel 0,09 bis 0,11 ms, je nach
 Sensor-Level. Im laufenden Betrieb mit Anzeige meldet die Statuszeile
 Werte zwischen 0,17 und 0,42 ms je Takt; die Differenz ist die Telemetrie und
-das gelegentliche Auffrischen der Anzeige. Ein gerendertes Bild in
-640 $times$ 480 kostet rund 3,9 ms und fällt nur in jedem zweiten Takt an.
+das gelegentliche Auffrischen der Anzeige.
 
-Damit werden von den verfügbaren 20 ms je Takt etwa 2,5 ms benutzt. Der
-gemessene Takt liegt stabil bei 50,0 Hz. Die eingangs getroffene Entscheidung
-gegen einen eigenen Regelungs-Thread (@sec:entwurf) ist damit bestätigt: Es gibt
-keinen Bedarf für Nebenläufigkeit, und die dadurch vermiedenen Fehlerquellen
-sind der eigentliche Gewinn.
+Deutlich teurer ist die Bildausgabe, also das Rendern in MuJoCo samt Übergabe
+an die Zeichenfläche. Sie hängt an der Fenstergröße und wurde bei drei Größen
+gemessen (@tab:zeit). Weil sie höchstens jeden zweiten Takt anfällt und die
+Bildrate zurückgenommen wird, sobald ein Bild mehr als etwa 5 ms je Takt
+kostet, bleibt der Regeltakt davon unberührt - bis zu einer Fenstergröße von
+1920 $times$ 1080 liegt er bei 50,0 Hz.
+
+#figure(
+  table(
+    columns: (auto, auto, auto, auto),
+    inset: 7pt,
+    align: (left, right, right, right),
+    [*Zeichenfläche*], [*Bildausgabe*], [*Bilder je s*], [*Regeltakt*],
+    [839 $times$ 534], [6,2 ms], [25], [50,0 Hz],
+    [1439 $times$ 714], [8,2 ms], [25], [50,0 Hz],
+    [4639 $times$ 2514], [140 ms], [2], [39 Hz],
+  ),
+  caption: [Kosten der Bildausgabe und ihre Auswirkung auf den Regeltakt. Die letzte Zeile ist ein virtueller Bildschirm über mehrere Monitore und damit ein Grenzfall weit jenseits üblicher Vollbildgrößen.],
+) <tab:zeit>
+
+Erst im letzten Fall - einer Zeichenfläche mit knapp zwölf Millionen Bildpunkten
+- wird die Bildausgabe so teuer, dass sie trotz zurückgenommener Bildrate auf
+den Takt durchschlägt. Bis dahin werden von den verfügbaren 20 ms je Takt im
+Mittel etwa 4 ms benutzt. Die eingangs getroffene Entscheidung gegen einen
+eigenen Regelungs-Thread (@sec:entwurf) ist damit bestätigt: Es gibt keinen
+Bedarf für Nebenläufigkeit, und die dadurch vermiedenen Fehlerquellen sind der
+eigentliche Gewinn.
 
 == Diskussion und Grenzen
 

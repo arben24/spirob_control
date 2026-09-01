@@ -59,11 +59,21 @@ Dezimation von 5 bei 4 ms Zeitschritt trainiert und rechnen mit einer Historie
 über fünf Takte. Ein anderer Takt würde ihnen eine andere Zeitachse vorsetzen
 als im Training.
 
-Gemessen auf dem Entwicklungsrechner: rund **0,2 ms** je Regelschritt und rund
-**4 ms** je gerendertem Bild – zusammen etwa ein Fünftel des Budgets. Die
-Anzeige wird bewusst seltener aufgefrischt als geregelt wird (Bild 25-mal,
-Zahlen 10-mal je Sekunde). Die Statuszeile zeigt den tatsächlich erreichten
-Takt; bleibt er dauerhaft unter 50 Hz, hilft ein Wechsel auf die Schema-Ansicht.
+Gemessen auf dem Entwicklungsrechner: rund **0,2 ms** je Regelschritt und
+**6 bis 8 ms** je Bildausgabe (MuJoCo-Rendern plus Übergabe an Tk, bei
+Fenstergrößen bis 1920 × 1080). Die Anzeige wird bewusst seltener aufgefrischt
+als geregelt wird: die Zahlen 10-mal je Sekunde, das Bild höchstens 25-mal.
+
+Wie oft gezeichnet wird, richtet sich dabei nach der gemessenen Dauer: Kostet
+ein Bild mehr als etwa 5 ms je Takt, wird entsprechend seltener gezeichnet
+(`RENDER_BUDGET_MS` in `app.py`). Das ist der Grund, warum auch ein Vollbild auf
+einem sehr großen Monitor den Regeltakt nicht mitreißt – dort sinkt die
+Bildrate, nicht die Regelfrequenz. Die Statuszeile zeigt den tatsächlich
+erreichten Takt.
+
+Die 3D-Ansicht rendert dabei immer in der Größe der Zeichenfläche und wächst
+mit dem Fenster mit; erst jenseits von 4K wird seitenverhältnisgetreu kleiner
+gerendert und das Bild hochskaliert.
 
 Der Zeitplan bleibt auf seinem ursprünglichen Raster: dauert ein Takt zu lange,
 werden verpasste Schlitze übersprungen, statt die Phase zu verschieben. Ein

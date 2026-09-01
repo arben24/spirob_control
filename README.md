@@ -54,8 +54,9 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
 
 - Die Oberfläche steuert den digitalen Zwilling und die Hardware in einem
   einzigen Prozess mit stabilen 50 Hz Regeltakt; ein Regelschritt kostet rund
-  0,2 ms, ein gerendertes Bild rund 4 ms (gemessen auf dem Entwicklungsrechner,
-  Anzeige in der Statusleiste).
+  0,2 ms, eine Bildausgabe 6 bis 8 ms (gemessen auf dem Entwicklungsrechner,
+  Anzeige in der Statusleiste). Die Bildrate richtet sich nach der gemessenen
+  Zeichendauer, damit auch ein Vollbild den Regeltakt nicht drückt.
 - Vier trainierte Policies der Sensor-Ablation (`force`, `tendon`, `imu`,
   `joints`) sind als NumPy-Gewichte eingebunden und in der Simulation direkt
   auswählbar. Ihre Zielabweichung im Nachbau stimmt mit den Messwerten am Ende

@@ -112,7 +112,8 @@ rechnet das Netz weiter - der Arm bewegt sich einfach falsch.
 
 == Ein Thread, 50 Hz
 - Regelkreis und Anzeige in *einer* Ereignisschleife - keine Sperren, keine Wettläufe
-- Regelschritt $approx$ 0,1 ms, gerendertes Bild $approx$ 4 ms von 20 ms Budget
+- Regelschritt $approx$ 0,1 ms, Bildausgabe 6 - 8 ms von 20 ms Budget
+- Die Bildrate regelt sich selbst - der Regeltakt bleibt bei 50 Hz
 - Verpasste Takte werden übersprungen, nicht nachgeholt
 - Fehler sind Betriebszustände: Kabel ab, kein Treiber, kein OpenGL $arrow.r$ Meldung statt Absturz
 

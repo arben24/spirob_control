@@ -16,10 +16,15 @@ Aufbau der Oberfläche::
 
 Alles läuft in **einem** Thread. Der Regelkreis hängt an Tks ``after()`` und
 rechnet 50-mal je Sekunde einen Schritt; die Anzeige wird seltener
-aufgefrischt (Bild 25-mal, Zahlen 10-mal je Sekunde). Ein Regelschritt kostet
-etwa 0,15 ms und ein gerendertes Bild etwa 4 ms -- das passt bequem in die
-20 ms je Takt, und ohne Threads gibt es keine Wettläufe zwischen Anzeige und
-Regelung. Genau das ist hier mit "robust" gemeint.
+aufgefrischt (Zahlen 10-mal je Sekunde, das Bild höchstens 25-mal). Ein
+Regelschritt kostet etwa 0,1 bis 0,2 ms, eine Bildausgabe je nach
+Fenstergröße 6 bis 8 ms -- das passt in die 20 ms je Takt, und ohne Threads
+gibt es keine Wettläufe zwischen Anzeige und Regelung. Genau das ist hier mit
+"robust" gemeint.
+
+Damit das auch auf einem sehr großen Bildschirm gilt, richtet sich die Bildrate
+danach, wie lange ein Bild tatsächlich dauert (siehe ``RENDER_BUDGET_MS``):
+Wird das Zeichnen teuer, wird seltener gezeichnet -- der Regeltakt bleibt.
 """
 
 from __future__ import annotations
@@ -45,8 +50,23 @@ from .view import RobotView
 CONTROL_PERIOD_S = 0.02
 """Regeltakt: 50 Hz, wie im Training (Dezimation 5 bei 4 ms Zeitschritt)."""
 
-RENDER_EVERY = 2   # Bild:  25 Hz
-REFRESH_EVERY = 5  # Zahlen: 10 Hz
+REFRESH_EVERY = 5  # Zahlen: 10-mal je Sekunde
+
+RENDER_EVERY_MIN = 2
+"""Schnellste Bildrate: jeder zweite Takt, also 25 Bilder je Sekunde."""
+
+RENDER_EVERY_MAX = 25
+"""Langsamste Bildrate: zwei Bilder je Sekunde."""
+
+RENDER_BUDGET_MS = 5.0
+"""Zeit, die ein Bild im Mittel je Takt kosten darf.
+
+Die Bildrate regelt sich danach selbst: Ein Bild in einem kleinen Fenster
+kostet Bruchteile einer Millisekunde und wird 25-mal je Sekunde gezeichnet; auf
+einem sehr großen Bildschirm kostet es ein Vielfaches, und dann wird eben
+seltener gezeichnet. Der Regeltakt bleibt in beiden Fällen bei 50 Hz - er ist
+das, worauf es ankommt, die Bildwiederholrate nicht.
+"""
 
 
 class SpirobApp(tk.Tk):
@@ -63,6 +83,7 @@ class SpirobApp(tk.Tk):
 
     self._policies = {info.label: info for info in policy_module.available_policies()}
     self._tick_count = 0
+    self._render_every = RENDER_EVERY_MIN
     self._next_tick = time.perf_counter()
     self._status_text = "Bereit. Die Simulation läuft; für die echte Hardware oben einen Port wählen."
 
@@ -644,8 +665,13 @@ class SpirobApp(tk.Tk):
         self.notebook.select(0)
 
     self._tick_count += 1
-    if self._tick_count % RENDER_EVERY == 0:
+    if self._tick_count % self._render_every == 0:
+      draw_start = time.perf_counter()
       self.view.draw(telemetry)
+      draw_ms = (time.perf_counter() - draw_start) * 1000.0
+      self._render_every = int(min(
+        RENDER_EVERY_MAX, max(RENDER_EVERY_MIN, math.ceil(draw_ms / RENDER_BUDGET_MS))
+      ))
     if self._tick_count % REFRESH_EVERY == 0:
       self._refresh_labels(telemetry)
 
