@@ -21,7 +21,10 @@ flowchart LR
     A["app.py<br/>Fenster, Regler, 50-Hz-Takt"] --> C["controller.py<br/>Regelkreis"]
     C --> S["simulation.py<br/>MuJoCo"]
     C --> P["policy.py<br/>NumPy-MLP"]
-    C --> H["hardware.py<br/>serielle Schnittstelle"]
+    C --> H["hardware.py<br/>Motor-Controller"]
+    C --> N["sensors.py<br/>Sensorplatine"]
+    N --> K["kinematics.py<br/>Armform aus Winkeln"]
+    K --> C
     S --> V["view.py<br/>3D / Schema"]
     C --> V
     W["workspace.py<br/>Arbeitsraum"] --> A
@@ -34,7 +37,9 @@ flowchart LR
 | `controller.py`  | ein Regelschritt: Modus, Kräfte, Sicherheitsgrenze, Telemetrie        |
 | `simulation.py`  | MuJoCo-Modell, Regelschritt, alle Sensorsignale, Kettenpunkte         |
 | `policy.py`      | Beobachtungsvektor bauen, Vorwärtspass, Aktion begrenzen              |
-| `hardware.py`    | serielle Verbindung, Telemetrie, Kraftkommandos – nicht blockierend   |
+| `hardware.py`    | Motor-Controller: Telemetrie und Kraftkommandos – nicht blockierend   |
+| `sensors.py`     | Sensorplatine: Frame-Parser und Gelenkwinkel aus den Beschleunigungen  |
+| `kinematics.py`  | Vorwärtskinematik: aus Gelenkwinkeln die Armform und die Spitze        |
 | `view.py`        | 3D-Bild aus MuJoCo bzw. 2D-Schema, Mausbedienung                      |
 | `workspace.py`   | Geometrie des erreichbaren Arbeitsraums (nur Standardbibliothek)      |
 | `theme.py`       | Farben, Schriften, ttk-Stile                                          |
@@ -47,7 +52,7 @@ der komplette Regelkreis in den Tests ohne Fenster durchfahren.
 
 Alle 20 ms ruft Tk `Controller.tick()` auf. Ein Takt läuft immer gleich ab:
 
-1. Hardware-Telemetrie abholen (nur was schon im Puffer liegt),
+1. Telemetrie beider Geräte abholen (nur was schon im Puffer liegt),
 2. Sollkräfte bestimmen – aus den Reglern oder aus der Policy,
 3. auf die Kraftgrenze begrenzen,
 4. die Simulation fünf Schritte à 4 ms rechnen,
@@ -79,6 +84,26 @@ Der Zeitplan bleibt auf seinem ursprünglichen Raster: dauert ein Takt zu lange,
 werden verpasste Schlitze übersprungen, statt die Phase zu verschieben. Ein
 verpasster Regelschritt bleibt so ein verpasster Schritt und wird nicht
 stillschweigend zu einem dauerhaft langsameren Regelkreis.
+
+## Zwei Datenquellen, ein Beobachtungsvektor
+
+Eine Policy verlangt bestimmte Signale; welche Quelle sie liefert, ist ihr
+gleich. Der `Controller` führt darüber Buch:
+
+* `available_signals()` sagt, welches Signal gerade aus welchem Gerät kommt,
+* `hardware_signals()` legt die Messwerte beider Geräte in einem Wörterbuch
+  zusammen,
+* `policy_ready()` vergleicht das mit dem, was die Policy braucht.
+
+Fehlt etwas, wird die Policy **nicht** mit Ersatzwerten gefahren: Die Kräfte
+gehen auf null, der Betrieb fällt in den Handbetrieb zurück, und die Meldung
+sagt, welches Signal fehlt und welches Gerät es liefern würde. Ein Netz mit
+einem plausibel aussehenden, aber falschen Eingabevektor rechnet nämlich
+klaglos weiter - der Arm bewegt sich dann einfach falsch.
+
+Die Sensordaten zählen zudem nur als Messung, solange frische Frames ankommen
+(eine Sekunde Toleranz). Ein stehengebliebener Datenstrom würde sonst eine
+eingefrorene Armform als aktuellen Zustand ausgeben.
 
 ## Konventionen
 
@@ -123,10 +148,11 @@ Das Programm ist darauf ausgelegt, dass Dinge schiefgehen:
 * **Weitere Policy** – exportieren (siehe [Policies](policies.md)) und die
   `.npz`-Datei nach `spirob_control/assets/policies/` legen. Die Oberfläche
   findet sie beim nächsten Start selbst.
-* **Weitere Sensorquelle** (z. B. die Beschleunigungssensor-Platine) – eine
-  Klasse mit `open/poll/signals/close` analog zu `HardwareLink` schreiben und
-  im `Controller` neben der bestehenden Quelle abfragen. `policy_ready()`
-  prüft danach automatisch, welche Policies damit laufen können.
+* **Weitere Sensorquelle** – eine Klasse mit `connect/poll/signals/disconnect`
+  analog zu `JointSensorLink` schreiben, ihre `provides` angeben und im
+  `Controller` neben den bestehenden Quellen abfragen. `available_signals()`
+  und `policy_ready()` rechnen sie dann von selbst mit ein, und die Prüfung,
+  welche Policy damit laufen kann, bleibt an einer Stelle.
 * **Weitere Aufgabe** (z. B. „Objekt umgreifen“) – die Zielvorgabe in der
   Policy-Karte ist bewusst schmal gehalten; ein Ziel mit mehr als zwei
   Freiheitsgraden bräuchte dort zusätzliche Regler und im Manifest einen

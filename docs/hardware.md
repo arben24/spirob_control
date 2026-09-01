@@ -2,19 +2,26 @@
 
 ## Aufbau
 
-An der Oberfläche hängt genau ein Gerät: der **ESP32-Motorcontroller** des
-SpiRob. Er treibt die beiden Seilspulen und regelt die Zugkraft; die GUI gibt
-ihm nur Sollkräfte vor und liest seine Telemetrie mit.
+An der Oberfläche hängen zwei Geräte an zwei USB-Ports:
+
+* der **ESP32-Motorcontroller** - er treibt die beiden Seilspulen und regelt
+  die Zugkraft. Ohne ihn bewegt sich nichts.
+* die **Sensorplatine** - 14 Beschleunigungssensoren entlang des Arms, aus
+  denen die 13 Gelenkwinkel und damit die tatsächliche Form des Arms folgen.
+  Sie ist optional, aber sie ist die einzige Möglichkeit, den echten Roboter
+  zu *sehen* statt nur zu kommandieren.
 
 ```mermaid
 flowchart LR
-    G["SpiRob Control<br/>(PC, 50 Hz)"] -- "f 0 42.50\\nf 1 0.00" --> M["ESP32<br/>Kraftregelung"]
-    M -- "Binärtelemetrie ~600 Hz<br/>Kraft, Seillänge" --> G
+    G["SpiRob Control<br/>(PC, 50 Hz)"] -- "f 0 42.50" --> M["ESP32<br/>Kraftregelung"]
+    M -- "Kraft, Seillänge<br/>~600 Hz" --> G
     M --> S0["Motor + Spule 0"]
     M --> S1["Motor + Spule 1"]
+    A["Sensorplatine<br/>14 Beschleunigungssensoren"] -- "Beschleunigungen<br/>je Segment" --> G
 ```
 
-Verbindung: USB, **460800 Baud**, 8N1.
+Verbindung: USB, **460800 Baud** zum Motorcontroller, **1 MBaud** zur
+Sensorplatine, jeweils 8N1.
 
 ## Protokoll
 
@@ -76,27 +83,105 @@ dann ankommen, wenn er sich vom letzten Wert kaum unterscheidet.
   Sollkraft stehen – im Zweifel Kabel neu anstecken und `stop` über einen
   erneuten Verbindungsaufbau schicken.
 
-## Grenzen des Hardwarebetriebs
+## Die Sensorplatine
 
-Der Motor-Controller liefert **Kraft** und **Seillänge**. Damit sind auf der
-echten Hardware die Policies der Sensor-Level `force` und `tendon` lauffähig.
+### Was sie liefert
 
-Die Level `imu` und `joints` brauchen die Segmentneigungen bzw. die 13
-Gelenkwinkel. Beides misst die **Beschleunigungssensor-Platine**, die an einem
-zweiten USB-Port hängt und von dieser Oberfläche noch nicht gelesen wird. Wählt
-man eine solche Policy und stellt die Rückmeldung auf „Hardware“, sagt die GUI
-genau das und schaltet zurück in den Handbetrieb, statt einen unvollständigen
-Beobachtungsvektor zu erfinden.
+Auf jedem der 14 Segmente sitzt ein Beschleunigungssensor. In Ruhe misst er die
+Richtung der Schwerkraft und damit die Neigung seines Segments; die Differenz
+zweier benachbarter Neigungen ist der Gelenkwinkel dazwischen. Weil alle
+Gelenke um dieselbe Achse drehen, lässt sich das geschlossen ausrechnen:
 
-In der **Simulation** sind alle vier Policies uneingeschränkt nutzbar, weil der
-digitale Zwilling jedes Signal liefern kann.
+```text
+phi_i = atan2(a_z, a_y)          Neigung von Segment i
+q_i   = phi_i - phi_(i+1)        Gelenkwinkel zwischen i und i+1
+```
+
+Das ist keine Näherung - das Problem zerfällt in 13 unabhängige
+Ein-Parameter-Probleme, und diese Ablesung trifft deren Minimum exakt. Sie
+kostet Bruchteile einer Millisekunde und braucht kein SciPy.
+
+Damit stehen drei Dinge zur Verfügung:
+
+| Größe | Wofür |
+| ----- | ----- |
+| `joint_pos`, `joint_vel` | Beobachtung für Policies des Sensor-Levels `joints` |
+| `segment_pitch` | Beobachtung für Sensor-Level `imu` |
+| Armform und Spitzenposition | Anzeige und der **gemessene** Zielabstand |
+
+### Protokoll
+
+Binärstrom, 1 MBaud:
+
+```text
+Kopf (12 B): 0xAA 0x55 | frame_id(u32) | t_esp_us(u32) | mode(u8) | n(u8)
+je Sensor:   sensor_id(u8) + 3 float32   (Modus ACC)
+             sensor_id(u8) + 6 float32   (Modus ACC+MAG)
+```
+
+Beim Verbinden schickt die GUI ein `a` und stellt die Platine damit auf reine
+Beschleunigungsdaten - die höchste Bildrate, und mehr wird nicht gebraucht.
+Wie beim Motorcontroller wird je Takt der Puffer geleert und nur der jüngste
+vollständige Frame ausgewertet. Ein Frame, der von keinem weiteren Kopf gefolgt
+wird, gilt als Fehltreffer und wird verworfen; das fängt verlorene Bytes ab,
+ohne den Parser aus dem Tritt zu bringen.
+
+Kommt eine Sekunde lang kein Frame mehr, gelten die Winkel als veraltet: Die
+Anzeige fällt auf die Simulation zurück und eine Policy, die die Sensordaten
+braucht, geht in den Handbetrieb. Eine eingefrorene Armform wäre die
+gefährlichere Antwort.
+
+### Inbetriebnahme
+
+1. Die Platine an einen **zweiten** USB-Port stecken, **Suchen** drücken.
+2. Unter „Sensorplatine (zweiter Port)“ den Port auswählen.
+3. **„Sensordaten verwenden“** anhaken - das ist zugleich der
+   Verbindungsschalter. Darunter erscheinen die Anzahl der empfangenen Frames
+   und der Bereich der gemessenen Winkel.
+4. Den Arm von Hand ein Stück biegen und die Schema-Ansicht beobachten: Die
+   grüne Linie muss der wirklichen Bewegung folgen. Biegt sie sich zur
+   **falschen** Seite, **„Winkel spiegeln“** anhaken - ob eine Biegung positive
+   oder negative Winkel liefert, hängt daran, wie herum die Platine montiert
+   ist, und das kann die Software nicht wissen.
+
+!!! note "Die Reihenfolge der Sensoren"
+    Voreingestellt ist die Zuordnung `0,1,…,7,32,…,37` von der Basis zur
+    Spitze, also die Reihenfolge der Platine selbst. Bewegt sich beim Biegen
+    eines einzelnen Gelenks in der Anzeige das falsche Gelenk, stimmt diese
+    Zuordnung nicht; sie steht als `SENSOR_IDS` in
+    `src/spirob_control/sensors.py`.
+
+### Was die Anzeige damit macht
+
+Sobald Sensordaten fließen, zeigt die **Schema-Ansicht** die gemessene Armform
+kräftig grün und die Simulation nur noch als blasse gestrichelte Linie
+dahinter. Der Abstand zwischen beiden Linien ist der Sim-to-Real-Unterschied.
+
+![Schema-Ansicht mit gemessener Armform](img/gui-sensoren.png)
+
+In der 3D-Ansicht wird die gemessene Form als grüner Strang über das Modell
+gelegt. Die Telemetrie bekommt zwei zusätzliche Felder: „Spitze gemessen“ und
+„Abstand gemessen“ - und erst dieser zweite Wert ist wirklich eine Messung.
+Ohne Platine bleiben beide Felder leer, statt die Simulation als Messung
+auszugeben.
+
+## Welche Policy läuft womit?
+
+| Sensor-Level | Simulation | Nur Motorcontroller | Motorcontroller + Sensorplatine |
+| ------------ | :--------: | :-----------------: | :-----------------------------: |
+| `force`      | ja         | ja                  | ja                              |
+| `tendon`     | ja         | ja                  | ja                              |
+| `imu`        | ja         | nein                | ja                              |
+| `joints`     | ja         | nein                | ja                              |
+
+Fehlt einer Policy ein Signal, sagt die Oberfläche welches und woher es käme,
+setzt die Kräfte auf null und geht in den Handbetrieb - statt einen
+unvollständigen Beobachtungsvektor zu erfinden.
 
 ## Was noch fehlt
 
-* Anbindung der Beschleunigungssensor-Platine als zweite Datenquelle. Damit
-  wären `imu` und `joints` auch auf der Hardware fahrbar – und aus den
-  Gelenkwinkeln ließe sich über die Vorwärtskinematik die **gemessene**
-  Position der Spitze berechnen. Heute zeigt die Telemetrie als „Spitze“ die
-  Position im digitalen Zwilling, nicht die des echten Arms.
-* Eine Messreihe auf der echten Hardware: Zielabweichung je Sensor-Level,
-  gefahren über den ganzen Arbeitsraum.
+* Eine Messreihe auf der echten Hardware: Zielabweichung je Sensor-Level über
+  den ganzen Arbeitsraum, gemessen statt simuliert. Alles dafür Nötige ist
+  jetzt vorhanden - die Oberfläche zeigt den gemessenen Zielabstand live an.
+* Ein Aufzeichnen dieser Werte aus der Oberfläche heraus (bisher müssen sie
+  abgelesen werden).

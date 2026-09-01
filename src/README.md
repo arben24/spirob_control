@@ -13,7 +13,9 @@ src/
 │   ├── controller.py        Regelkreis - kennt keine Widgets
 │   ├── simulation.py        MuJoCo-Modell und Sensorsignale
 │   ├── policy.py            Vorwärtspass der trainierten Netze (NumPy)
-│   ├── hardware.py          serielle Verbindung zum ESP32
+│   ├── hardware.py          serielle Verbindung zum Motor-Controller
+│   ├── sensors.py           Sensorplatine: Frames -> 13 Gelenkwinkel
+│   ├── kinematics.py        Vorwärtskinematik (Armform, Spitze)
 │   ├── view.py              3D- und Schema-Ansicht
 │   ├── workspace.py         Arbeitsraum-Geometrie (nur Standardbibliothek)
 │   ├── theme.py             Farben, Schriften, ttk-Stile
@@ -60,7 +62,10 @@ python -m pytest
 - **Der Regelkreis kennt keine Oberfläche.** Alles Fachliche gehört in
   `controller.py` oder tiefer, damit es ohne Fenster testbar bleibt.
 - **Nichts blockiert im Takt.** Serielles Lesen holt nur, was schon im Puffer
-  liegt; kein `sleep`, kein Warten auf Antwort.
+  liegt; kein `sleep`, kein Warten auf Antwort. Das gilt für beide Geräte.
+- **Eine Datenquelle meldet, was sie liefern kann.** Jede Quelle hat
+  `provides`, `connect`, `poll`, `signals`, `disconnect`; ob eine Policy damit
+  laufen kann, entscheidet allein `Controller.policy_ready()`.
 - **Fehler dürfen den Takt nicht abbrechen.** Ein abgezogenes USB-Kabel ist ein
   Betriebszustand: Meldung in die Statuszeile, Simulation läuft weiter.
 - **Windows zuerst mitdenken:** keine POSIX-Pfade, kein `select()` auf `stdin`,

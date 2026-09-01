@@ -64,6 +64,20 @@ wie viel Sensorik die Aufgabe wirklich braucht (@tab:level).
   caption: [Die vier trainierten Sensor-Level. Alle sehen zusätzlich Ziel und letzte Aktion.],
 ) <tab:level>
 
+Welche dieser Level auf der echten Maschine überhaupt fahrbar sind, entscheidet
+die vorhandene Sensorik. Der Motorcontroller misst Kraft und Seillänge, deckt
+also `force` und `tendon` ab. Die beiden genaueren Level brauchen die Form des
+Arms, und die misst eine zweite Platine mit 14 Beschleunigungssensoren, je einem
+pro Segment: In Ruhe zeigt jeder von ihnen die Richtung der Schwerkraft und
+damit die Neigung seines Segments. Weil alle Gelenke um dieselbe Achse drehen,
+lässt sich daraus geschlossen ablesen, wie der Arm steht -
+
+$ phi_i = "atan2"(a_z, a_y), quad q_i = phi_i - phi_(i+1) $ <eq:winkel>
+
+wobei $phi_i$ die Neigung von Segment $i$ und $q_i$ der Gelenkwinkel dazwischen
+ist. Das ist keine Näherung: Das Least-Squares-Problem zerfällt in 13
+unabhängige Ein-Parameter-Probleme, und @eq:winkel trifft deren Minimum exakt.
+
 Entscheidend für diese Arbeit ist, dass die Policy deterministisch ausgewertet
 werden kann: Sie wurde ohne Beobachtungsnormalisierung und mit skalarer
 Standardabweichung trainiert, sodass die auszuführende Aktion exakt die

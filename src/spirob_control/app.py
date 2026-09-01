@@ -191,25 +191,51 @@ class SpirobApp(tk.Tk):
     card.grid(row=0, column=0, sticky="ew", pady=(0, 10))
     card.columnconfigure(0, weight=1)
 
+    # --- Motor-Controller: der Aktor, ohne den sich nichts bewegt ---
+    ttk.Label(card, text="Motor-Controller", style="Card.TLabel").grid(
+      row=1, column=0, columnspan=2, sticky="w")
     self.var_port = tk.StringVar()
-    self.cmb_port = ttk.Combobox(card, textvariable=self.var_port, state="readonly", width=26)
-    self.cmb_port.grid(row=1, column=0, sticky="ew", padx=(0, 6))
-    ttk.Button(card, text="Suchen", width=8, command=self._refresh_ports).grid(row=1, column=1)
+    self.cmb_port = ttk.Combobox(card, textvariable=self.var_port, state="readonly", width=24)
+    self.cmb_port.grid(row=2, column=0, sticky="ew", padx=(0, 6))
+    ttk.Button(card, text="Suchen", width=8, command=self._refresh_ports).grid(row=2, column=1)
 
     self.btn_connect = ttk.Button(card, text="Verbinden", style="Accent.TButton",
                                   command=self._toggle_connection)
-    self.btn_connect.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+    self.btn_connect.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(6, 0))
 
     self.var_send_hw = tk.BooleanVar(value=False)
     ttk.Checkbutton(card, text="Kräfte an die Hardware senden", variable=self.var_send_hw,
-                    command=self._on_send_toggle).grid(row=3, column=0, columnspan=2,
-                                                       sticky="w", pady=(8, 0))
+                    command=self._on_send_toggle).grid(row=4, column=0, columnspan=2,
+                                                       sticky="w", pady=(6, 0))
     self.var_null = tk.BooleanVar(value=False)
     ttk.Checkbutton(card, text="Seillängen nullen (Arm gerade)",
-                    variable=self.var_null).grid(row=4, column=0, columnspan=2, sticky="w")
+                    variable=self.var_null).grid(row=5, column=0, columnspan=2, sticky="w")
 
     self.lbl_conn = ttk.Label(card, text="Nicht verbunden.", style="Muted.TLabel", wraplength=340)
-    self.lbl_conn.grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 0))
+    self.lbl_conn.grid(row=6, column=0, columnspan=2, sticky="w", pady=(4, 8))
+
+    ttk.Separator(card, orient="horizontal").grid(row=7, column=0, columnspan=2,
+                                                  sticky="ew", pady=(0, 8))
+
+    # --- Sensorplatine: zweiter USB-Port, misst die Form des echten Arms ---
+    ttk.Label(card, text="Sensorplatine (zweiter Port)", style="Card.TLabel").grid(
+      row=8, column=0, columnspan=2, sticky="w")
+    self.var_sensor_port = tk.StringVar()
+    self.cmb_sensor_port = ttk.Combobox(card, textvariable=self.var_sensor_port,
+                                        state="readonly", width=24)
+    self.cmb_sensor_port.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(2, 0))
+
+    self.var_use_sensors = tk.BooleanVar(value=False)
+    ttk.Checkbutton(card, text="Sensordaten verwenden", variable=self.var_use_sensors,
+                    command=self._on_use_sensors_toggle).grid(
+      row=10, column=0, columnspan=2, sticky="w", pady=(6, 0))
+    self.var_sensor_flip = tk.BooleanVar(value=False)
+    ttk.Checkbutton(card, text="Winkel spiegeln", variable=self.var_sensor_flip,
+                    command=self._on_sensor_flip).grid(row=11, column=0, columnspan=2, sticky="w")
+
+    self.lbl_sensor = ttk.Label(card, text="Sensorplatine nicht verbunden.",
+                                style="Muted.TLabel", wraplength=340)
+    self.lbl_sensor.grid(row=12, column=0, columnspan=2, sticky="w", pady=(4, 0))
 
     self._refresh_ports()
 
@@ -401,6 +427,7 @@ class SpirobApp(tk.Tk):
       ("Sollkraft Seil 0", "f0", "Sollkraft Seil 1", "f1"),
       ("Spitze x / z", "tcp", "Ziel x / z", "target"),
       ("Abstand zum Ziel", "err", "Policy-Aktion", "action"),
+      ("Spitze gemessen", "m_tcp", "Abstand gemessen", "m_err"),
       ("Kraft ist (HW)", "hw_force", "Seillänge (HW)", "hw_rope"),
       ("Regeltakt", "rate", "Rechenzeit je Takt", "tick"),
     ]
@@ -432,6 +459,10 @@ class SpirobApp(tk.Tk):
     ports = [value for value in self.cmb_port["values"]]
     if self.settings["port"] and self.settings["port"] in ports:
       self.var_port.set(self.settings["port"])
+    if self.settings["sensor_port"] and self.settings["sensor_port"] in ports:
+      self.var_sensor_port.set(self.settings["sensor_port"])
+    self.var_sensor_flip.set(bool(self.settings["sensor_flip"]))
+    self.controller.sensors.sign = -1.0 if self.var_sensor_flip.get() else 1.0
     labels = list(self._policies)
     wanted = [label for label, info in self._policies.items()
               if info.path.name == self.settings["policy"]]
@@ -448,6 +479,8 @@ class SpirobApp(tk.Tk):
     info = self._policies.get(self.var_policy.get())
     return {
       "port": self.var_port.get(),
+      "sensor_port": self.var_sensor_port.get(),
+      "sensor_flip": bool(self.var_sensor_flip.get()),
       "policy": info.path.name if info else "",
       "view_mode": self.var_view.get(),
       "force_limit_n": float(self.var_limit.get()),
@@ -458,9 +491,16 @@ class SpirobApp(tk.Tk):
 
   def _refresh_ports(self) -> None:
     ports = hardware.available_ports()
-    self.cmb_port["values"] = [device for device, _ in ports]
+    devices = [device for device, _ in ports]
+    self.cmb_port["values"] = devices
+    self.cmb_sensor_port["values"] = devices
     if ports and not self.var_port.get():
       self.var_port.set(hardware.guess_port() or ports[0][0])
+    if ports and not self.var_sensor_port.get():
+      # Vorschlag: der andere Port, denn die beiden Platinen hängen nie am
+      # selben Anschluss.
+      others = [d for d in devices if d != self.var_port.get()]
+      self.var_sensor_port.set(others[0] if others else "")
     if not hardware.SERIAL_AVAILABLE:
       self.lbl_conn.configure(
         text="pyserial ist nicht installiert - Hardwarebetrieb nicht möglich. "
@@ -489,22 +529,105 @@ class SpirobApp(tk.Tk):
 
   def _update_connection_widgets(self) -> None:
     link = self.controller.hardware
+    sending = self.controller.state.send_to_hardware and link.connected
+
+    # Die Anzeige oben rechts sagt in einem Blick, was gerade an echter
+    # Hardware hängt - und ob davon etwas Kräfte bekommt.
+    parts = []
+    if link.connected:
+      parts.append("Motor sendet" if sending else "Motor")
+    if self.controller.sensors_active:
+      parts.append("Sensoren")
+    if not parts:
+      self.lbl_link.configure(text="● nur Simulation", fg=theme.MUTED)
+    else:
+      self.lbl_link.configure(text="● " + " + ".join(parts),
+                              fg=theme.OK if sending else theme.WARN)
+
     if link.connected:
       self.btn_connect.configure(text="Trennen")
       self.lbl_conn.configure(text=f"Verbunden: {link.port} @ {hardware.BAUD_RATE} Baud, "
                                    f"{link.packets} Pakete empfangen.")
-      sending = self.controller.state.send_to_hardware
-      self.lbl_link.configure(
-        text="● Hardware aktiv" if sending else "● Hardware verbunden",
-        fg=theme.OK if sending else theme.WARN,
-      )
     else:
       self.btn_connect.configure(text="Verbinden")
-      self.lbl_link.configure(text="● nur Simulation", fg=theme.MUTED)
       if link.last_error:
         self.lbl_conn.configure(text=f"Nicht verbunden ({link.last_error}).")
       elif hardware.SERIAL_AVAILABLE:
         self.lbl_conn.configure(text="Nicht verbunden.")
+    self._update_sensor_widgets()
+
+  def _update_sensor_widgets(self) -> None:
+    sensors = self.controller.sensors
+    if not sensors.connected:
+      self.lbl_sensor.configure(
+        text=f"Nicht verbunden ({sensors.last_error})." if sensors.last_error
+        else "Sensorplatine nicht verbunden - die Anzeige zeigt die Simulation.")
+      return
+    if not sensors.has_data:
+      # Verbunden, aber es kommt nichts: das ist ein anderer Fehler als "kein
+      # Port", und die Meldung muss das unterscheiden.
+      self.lbl_sensor.configure(
+        text=f"{sensors.port}: verbunden, aber keine Frames. Verkabelung und "
+             "Firmware der Platine prüfen.")
+      return
+    angles = sensors.angles_deg()
+    self.lbl_sensor.configure(
+      text=f"{sensors.port}: {sensors.frames} Frames, Winkel "
+           f"{angles.min():+.0f}° bis {angles.max():+.0f}°.")
+
+  def _on_use_sensors_toggle(self) -> None:
+    """Sensorplatine ein- oder ausschalten.
+
+    Der Haken ist zugleich der Verbindungsschalter: gesetzt heißt verbinden und
+    auswerten, entfernt heißt trennen. Scheitert das Verbinden, geht der Haken
+    von selbst wieder heraus - so zeigt er nie einen Zustand an, den es nicht
+    gibt.
+    """
+    if not self.var_use_sensors.get():
+      self.controller.state.use_sensors = False
+      self.controller.sensors.disconnect()
+      self._set_status("Sensorplatine getrennt. Die Anzeige zeigt wieder die Simulation.")
+      self._update_connection_widgets()
+      return
+
+    port = self.var_sensor_port.get()
+    if not port:
+      self.var_use_sensors.set(False)
+      messagebox.showinfo("Kein Port", "Bitte zuerst den Port der Sensorplatine auswählen.")
+      return
+    if port == self.var_port.get() and self.controller.hardware.connected:
+      self.var_use_sensors.set(False)
+      messagebox.showinfo(
+        "Port bereits belegt",
+        f"{port} ist der Motor-Controller. Die Sensorplatine hängt an einem "
+        "zweiten Anschluss.")
+      return
+
+    self.controller.sensors.sign = -1.0 if self.var_sensor_flip.get() else 1.0
+    if self.controller.sensors.connect(port):
+      self.controller.state.use_sensors = True
+      self._set_status(
+        f"Sensorplatine an {port} verbunden. Anzeige und Policy können jetzt die "
+        "gemessenen Gelenkwinkel nutzen.")
+    else:
+      self.var_use_sensors.set(False)
+      self.controller.state.use_sensors = False
+      messagebox.showerror("Sensorplatine", str(self.controller.sensors.last_error))
+      self._set_status(f"Sensorplatine: {self.controller.sensors.last_error}")
+    self._update_connection_widgets()
+
+  def _on_sensor_flip(self) -> None:
+    """Vorzeichen der gemessenen Winkel umkehren.
+
+    Ob eine Biegung nach +x positive oder negative Winkel liefert, hängt daran,
+    wie herum die Platine montiert ist - das kann die Software nicht wissen.
+    Steht der Arm im Schema spiegelverkehrt zur Wirklichkeit, ist dieser
+    Schalter gemeint. Er wirkt sofort.
+    """
+    self.controller.sensors.sign = -1.0 if self.var_sensor_flip.get() else 1.0
+    self._set_status(
+      "Gemessene Winkel werden gespiegelt." if self.var_sensor_flip.get()
+      else "Gemessene Winkel werden unverändert übernommen.")
 
   def _on_send_toggle(self) -> None:
     wanted = self.var_send_hw.get()
@@ -613,7 +736,11 @@ class SpirobApp(tk.Tk):
   def _on_limit_change(self) -> None:
     limit = float(self.var_limit.get())
     self.controller.state.force_limit_n = limit
-    self.lbl_limit.configure(text=f"{limit:.0f} N")
+    # Eine gedrosselte Grenze wird farblich hervorgehoben: Sie bleibt über das
+    # Programmende hinaus gespeichert, und eine Policy, die still auf einen
+    # Bruchteil ihrer Kraft gedeckelt ist, regelt scheinbar grundlos schlecht.
+    self.lbl_limit.configure(
+      text=f"{limit:.0f} N", foreground=theme.TEXT if limit >= FORCE_LIMIT_N else theme.WARN)
 
   def _toggle_emergency_stop(self) -> None:
     if self.controller.state.emergency_stop:
@@ -694,6 +821,13 @@ class SpirobApp(tk.Tk):
     self.tele["action"].configure(
       text="–" if telemetry.action is None
       else f"{telemetry.action[0]:+.2f} / {telemetry.action[1]:+.2f}")
+    if telemetry.measured_tcp_xz is not None:
+      self.tele["m_tcp"].configure(
+        text=f"{telemetry.measured_tcp_xz[0]:+.3f} / {telemetry.measured_tcp_xz[1]:+.3f} m")
+      self.tele["m_err"].configure(text=f"{telemetry.measured_error_m * 1000:6.0f} mm")
+    else:
+      self.tele["m_tcp"].configure(text="–")
+      self.tele["m_err"].configure(text="–")
     if telemetry.hardware_force_n is not None:
       self.tele["hw_force"].configure(
         text=f"{telemetry.hardware_force_n[0]:5.1f} / {telemetry.hardware_force_n[1]:5.1f} N")

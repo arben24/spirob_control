@@ -102,6 +102,13 @@ eigentliche Gewinn.
 
 == Diskussion und Grenzen
 
+Zur zweiten Frage der Arbeit - wie viel Sensorik nötig ist - liefert
+@tab:genauigkeit eine klare Rangfolge, die sich nun auch auf der Maschine
+nachfahren lässt: Ohne jede Rückmeldung (`force`) ist die Aufgabe nicht lösbar;
+die Seilencoder allein (`tendon`) bringen den Fehler auf ein Viertel, und die
+Gelenkwinkel (`joints`) noch einmal deutlich weiter. Damit ist auch die
+praktische Frage beantwortet, ob sich die zweite Platine lohnt.
+
 Die Ergebnisse belegen, dass sich eine gelernte Regelung aus ihrer
 Trainingsumgebung herauslösen lässt, ohne ihr Verhalten zu verändern - und dass
 sich das auch nachweisen lässt, wenn man den Nachweis über das Verhalten führt
@@ -109,13 +116,18 @@ statt über Dimensionen. Ein Vergleich der Netzausgaben zwischen PyTorch und dem
 NumPy-Nachbau auf identischen Eingaben würde die Aussage weiter härten und wäre
 mit geringem Aufwand nachzuholen.
 
-Drei Einschränkungen sind zu nennen. Erstens sind alle hier berichteten Zahlen
-Simulationswerte; der Sim-to-Real-Abstand ist damit nicht vermessen. Zweitens
-bindet die Oberfläche derzeit nur den Motorcontroller an, sodass auf der realen
-Hardware ausschließlich die Level `force` und `tendon` fahrbar sind - die
-genaueren Varianten brauchen die Beschleunigungssensor-Platine als zweite
-Datenquelle. Drittens zeigt die Telemetrie als Position der Spitze die des
-digitalen Zwillings; solange die reale Armform nicht gemessen wird, ist der
-angezeigte Zielabstand im Hardwarebetrieb eine Erwartung und keine Messung.
-Diese drei Punkte hängen zusammen und lassen sich mit derselben Erweiterung
-beheben (@sec:zusammenfassung).
+Zwei Einschränkungen bleiben. Erstens sind alle hier berichteten Zahlen
+Simulationswerte; der Sim-to-Real-Abstand ist damit noch nicht vermessen. Die
+Voraussetzungen dafür sind allerdings geschaffen: Mit der angebundenen
+Sensorplatine sind alle vier Sensor-Level auch auf der realen Hardware fahrbar,
+und die Oberfläche zeigt den Abstand zwischen kommandiertem Ziel und gemessener
+Spitze live an - dieselbe Größe, auf die im Training belohnt wurde. Was fehlt,
+ist die Messreihe selbst und ein Aufzeichnen dieser Werte aus der Oberfläche
+heraus.
+
+Zweitens hängt die Güte der gemessenen Armform an zwei Annahmen über den
+Einbau, die die Software nicht prüfen kann: die Zuordnung der Sensoren zu den
+Segmenten und das Vorzeichen der Winkel. Beides lässt sich in wenigen Sekunden
+verifizieren, indem man den Arm von Hand biegt und die Anzeige beobachtet -
+aber es ist ein Handgriff, der vor jeder Messreihe stehen muss, und kein
+Automatismus.

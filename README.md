@@ -4,7 +4,9 @@ Eine schlanke Desktop-Anwendung, mit der sich der SpiRob auf zwei Arten fahren
 lässt: **von Hand** über zwei Schieberegler für die beiden Seilkräfte, oder
 **über eine trainierte Policy**, der man nur noch sagt, wohin die Spitze soll.
 Beides läuft immer gegen den mitgelieferten digitalen Zwilling (MuJoCo) und
-kann per Knopfdruck auf die echte Hardware gelegt werden.
+kann per Knopfdruck auf die echte Hardware gelegt werden. Hängt die
+Sensorplatine am zweiten USB-Port, zeigt die Anzeige die **gemessene** Form des
+echten Arms, und die Policy kann auf den echten Gelenkwinkeln regeln.
 
 ![Die Oberfläche im Policy-Betrieb](docs/img/gui-policy.png)
 
@@ -47,11 +49,18 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
   Trainingsumgebung mitzuschleppen.
 - Simulation und Hardware in **einer** Oberfläche, mit klarer Anzeige, welche
   von beiden gerade Kräfte bekommt.
+- Die vorhandene Sensorik einbinden, sodass die Anzeige den echten Arm zeigt
+  und jede trainierte Policy auch auf gemessenen Daten laufen kann.
 - Lauffähig auf einem frisch aufgesetzten Windows-Rechner: klonen,
   `run_gui.bat` doppelklicken, fertig.
 
 ## Ergebnisse
 
+- Zwei Hardwarequellen an zwei USB-Ports: der Motor-Controller (Seilkräfte,
+  Seillängen) und die Sensorplatine (13 Gelenkwinkel aus 14
+  Beschleunigungssensoren). Aus deren Winkeln folgt über die Vorwärtskinematik
+  die tatsächliche Armform - damit wird aus dem angezeigten Zielabstand eine
+  Messung statt einer Erwartung.
 - Die Oberfläche steuert den digitalen Zwilling und die Hardware in einem
   einzigen Prozess mit stabilen 50 Hz Regeltakt; ein Regelschritt kostet rund
   0,2 ms, eine Bildausgabe 6 bis 8 ms (gemessen auf dem Entwicklungsrechner,
@@ -62,8 +71,10 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
   auswählbar. Ihre Zielabweichung im Nachbau stimmt mit den Messwerten am Ende
   des Trainings überein (z. B. `joints` 42 mm) – der Export und der Nachbau der
   Beobachtung sind damit nachweislich korrekt.
-- 36 automatisierte Tests sichern die Nahtstelle zwischen Training und GUI ab
-  (Beobachtungslayout, Kraftabbildung, ein vollständiger Rollout bis ans Ziel).
+- 51 automatisierte Tests sichern die kritischen Nahtstellen ab: das
+  Beobachtungslayout, die Kraftabbildung, ein vollständiger Rollout bis ans
+  Ziel und - über ein virtuelles Terminalpaar - der komplette Weg von den Bytes
+  der Sensorplatine bis zum Gelenkwinkel.
 - Die Anwendung läuft ohne PyTorch, mjlab oder CUDA; installiert werden nur
   MuJoCo, NumPy, pyserial und Pillow.
 
@@ -72,7 +83,7 @@ ohne GPU aus und ist nach `git clone` in unter einer Minute startklar.
 - **Python 3.10+** mit **Tkinter** (Standardbibliothek) für die Oberfläche
 - **MuJoCo** für den digitalen Zwilling und die 3D-Ansicht
 - **NumPy** für den Vorwärtspass der Policies
-- **pyserial** für die serielle Verbindung zum ESP32-Motorcontroller
+- **pyserial** für die serielle Verbindung zu Motor-Controller und Sensorplatine
 - **pytest** für die Tests, **Typst** für die schriftlichen Abgaben,
   **MkDocs Material** + GitLab CI/CD für Website und PDFs
 
@@ -139,5 +150,6 @@ CI-Lauf und hängen dort als Artefakt bzw. auf der Website unter „Downloads“
 - Exposé, schriftliche Arbeit und Präsentation weiter ausformulieren – die
   Rohfassungen in `expose/`, `report/` und `slides/` sind bereits mit dem
   Inhalt dieses Projekts gefüllt.
-- Messreihen auf der echten Hardware ergänzen (siehe
-  [Hardware](docs/hardware.md), Abschnitt „Was noch fehlt“).
+- Messreihen auf der echten Hardware ergänzen: Die Oberfläche zeigt den
+  gemessenen Zielabstand jetzt live an, aufgezeichnet wird er noch nicht
+  (siehe [Hardware](docs/hardware.md), Abschnitt „Was noch fehlt“).

@@ -16,6 +16,8 @@ SETTINGS_PATH = Path.home() / ".spirob_control.json"
 
 DEFAULTS: dict = {
   "port": "",
+  "sensor_port": "",
+  "sensor_flip": False,
   "policy": "reach_tendon.npz",
   "view_mode": "3d",
   "force_limit_n": 150.0,

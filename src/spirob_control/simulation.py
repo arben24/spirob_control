@@ -81,6 +81,18 @@ class Simulation:
     self.qpos_adr = np.array([self.model.jnt_qposadr[j] for j in self.joint_ids])
     self.qvel_adr = np.array([self.model.jnt_dofadr[j] for j in self.joint_ids])
 
+    # Gliedlängen der Kette, Basis -> Spitze: der Versatz eines Segments zum
+    # nächsten, zuletzt der Versatz vom letzten Segment zum TCP. Aus dem
+    # kompilierten Modell gelesen, damit die Vorwärtskinematik über die
+    # gemessenen Winkel dieselbe Geometrie benutzt wie die Simulation.
+    body_ids = [
+      mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, f"seg_{i}")
+      for i in range(NUM_SEGMENTS - 1, -1, -1)
+    ]
+    lengths = [float(self.model.body_pos[child][2]) for child in body_ids[1:]]
+    lengths.append(float(self.model.site_pos[self.tcp_site_id][2]))
+    self.link_lengths = np.array(lengths)
+
     self.reset()
 
   # -- Zustand ---------------------------------------------------------------

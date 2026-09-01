@@ -69,3 +69,65 @@ def test_telemetrie_bleibt_vollstaendig():
   assert telemetry.chain_xz is not None and telemetry.chain_xz.shape[1] == 2
   assert telemetry.hardware_force_n is None  # nichts verbunden
   assert np.isfinite(telemetry.error_m)
+
+
+# ---------------------------------------------------------------------------
+# Sensorplatine
+# ---------------------------------------------------------------------------
+
+def test_sensoren_liefern_die_gemessene_armform(sensor_link):
+  from spirob_control import kinematics
+
+  angles = np.full(13, 0.15)
+  link, _master = sensor_link(angles)
+  ctrl = Controller(sensors=link)
+  ctrl.state.use_sensors = True
+  telemetry = ctrl.tick()
+  assert telemetry.measured_chain_xz is not None
+  expected = kinematics.tcp_xz(angles, ctrl.sim.link_lengths)
+  assert telemetry.measured_tcp_xz == pytest.approx(expected, abs=1e-6)
+  # Der gemessene Arm ist gebogen, der simulierte steht noch gerade - die
+  # beiden Spitzen dürfen also nicht zusammenfallen.
+  assert telemetry.measured_tcp_xz != pytest.approx(telemetry.tcp_xz, abs=1e-3)
+
+
+def test_ohne_haken_werden_sensordaten_ignoriert(sensor_link):
+  """Die Platine darf angeschlossen sein, ohne benutzt zu werden."""
+  link, _master = sensor_link(np.full(13, 0.1))
+  ctrl = Controller(sensors=link)
+  ctrl.state.use_sensors = False
+  telemetry = ctrl.tick()
+  assert telemetry.measured_chain_xz is None
+  assert ctrl.sensors_active is False
+  assert "joint_pos" not in ctrl.available_signals()
+
+
+def test_policy_laeuft_mit_gemessenen_gelenkwinkeln(sensor_link):
+  """Eine joints-Policy muss an der Hardware laufen, sobald die Platine hängt."""
+  from spirob_control import policy as policy_module
+
+  link, _master = sensor_link(np.full(13, 0.05))
+  ctrl = Controller(sensors=link)
+  ctrl.state.use_sensors = True
+  ctrl.load_policy(policy_module.ASSET_DIR / "reach_joints.npz")
+  ctrl.set_mode(MODE_POLICY)
+  ctrl.state.observation_source = SOURCE_HARDWARE
+  ok, reason = ctrl.policy_ready()
+  assert ok, reason
+  telemetry = ctrl.tick()
+  assert ctrl.state.mode == MODE_POLICY  # kein Rückfall
+  assert telemetry.action is not None
+
+
+def test_veraltete_sensordaten_zaehlen_nicht_als_messung(sensor_link):
+  """Ein stehengebliebener Stream darf nicht als aktuelle Armform durchgehen."""
+  from spirob_control import sensors as sensors_module
+
+  link, _master = sensor_link(np.full(13, 0.1))
+  ctrl = Controller(sensors=link)
+  ctrl.state.use_sensors = True
+  assert ctrl.tick().measured_chain_xz is not None
+  # Zeitstempel des letzten Frames künstlich altern lassen
+  link._last_frame_ts -= sensors_module.FRAME_TIMEOUT_S + 1.0
+  assert link.has_data is False
+  assert ctrl.tick().measured_chain_xz is None

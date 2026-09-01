@@ -147,3 +147,46 @@ def test_regeltakt_bleibt_trotz_grossem_fenster(app):
   pump(app, 2.0)
   rate = (app.controller.telemetry.ticks - before) / (time.perf_counter() - start)
   assert rate > 40.0, f"Regeltakt auf {rate:.1f} Hz eingebrochen"
+
+
+def test_sensorplatine_ueber_die_oberflaeche(app, sensor_link, monkeypatch):
+  """Der Haken „Sensordaten verwenden“ verbindet, zeigt an und trennt wieder."""
+  from tkinter import messagebox
+
+  monkeypatch.setattr(messagebox, "showinfo", lambda *a, **k: None)
+  monkeypatch.setattr(messagebox, "showerror", lambda *a, **k: None)
+
+  link, master = sensor_link([0.1] * 13)
+  port = link.port
+  link.disconnect()  # die Oberfläche soll den Port selbst öffnen
+
+  app.var_sensor_port.set(port)
+  app.var_use_sensors.set(True)
+  app._on_use_sensors_toggle()
+  assert app.controller.state.use_sensors is True
+  assert app.controller.sensors.connected is True
+
+  # Frames einspeisen, bis die Anbindung sie verarbeitet hat.
+  sensor_link.feed(app.controller.sensors, master, [0.1] * 13, first_id=10)
+  pump(app, 0.3)
+  assert app.controller.sensors_active is True
+  assert app.controller.telemetry.measured_tcp_xz is not None
+
+  app.var_use_sensors.set(False)
+  app._on_use_sensors_toggle()
+  pump(app, 0.2)
+  assert app.controller.sensors.connected is False
+  assert app.controller.telemetry.measured_chain_xz is None
+
+
+def test_haken_geht_bei_falschem_port_wieder_heraus(app, monkeypatch):
+  from tkinter import messagebox
+
+  monkeypatch.setattr(messagebox, "showerror", lambda *a, **k: None)
+  monkeypatch.setattr(messagebox, "showinfo", lambda *a, **k: None)
+
+  app.var_sensor_port.set("/dev/gibtesnicht")
+  app.var_use_sensors.set(True)
+  app._on_use_sensors_toggle()
+  assert app.var_use_sensors.get() is False
+  assert app.controller.state.use_sensors is False

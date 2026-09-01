@@ -12,8 +12,9 @@ bekommt – und der **Not-Aus**.
 | Element                     | Bedeutung                                                                 |
 | --------------------------- | ------------------------------------------------------------------------- |
 | `● nur Simulation`          | Es ist keine Hardware verbunden; alles bleibt im digitalen Zwilling.       |
-| `● Hardware verbunden` (gelb) | Verbunden, aber es werden **keine** Kräfte gesendet.                     |
-| `● Hardware aktiv` (grün)   | Die angezeigten Kräfte gehen wirklich an die Motoren.                      |
+| `● Motor` (gelb)            | Motor-Controller verbunden, aber es werden **keine** Kräfte gesendet.      |
+| `● Motor sendet` (grün)     | Die angezeigten Kräfte gehen wirklich an die Motoren.                      |
+| `● Sensoren`                | Die Sensorplatine liefert Daten; die Anzeige zeigt den echten Arm.         |
 | **NOT-AUS**                 | Kräfte sofort auf 0 N und Kraftregelung stoppen. Auch mit der Leertaste.   |
 
 ## Handbetrieb
@@ -58,10 +59,12 @@ Simulation sind alle vier nutzbar; `joints` regelt am genauesten, `tendon`
 läuft auch auf der Hardware.
 
 **Die Policy sieht die Sensordaten aus …** entscheidet, woher die Rückmeldung
-kommt: aus der Simulation (immer möglich) oder aus der echten Hardware. Für
-Letzteres muss der Motor-Controller die benötigten Signale liefern können;
-kann er es nicht, sagt die Oberfläche das und schaltet zurück in den
-Handbetrieb, statt blind weiterzufahren.
+kommt: aus der Simulation (immer möglich) oder aus der echten Hardware. Im
+zweiten Fall muss das, was angeschlossen ist, die benötigten Signale liefern:
+Seillänge und -geschwindigkeit kommen vom Motor-Controller, Gelenkwinkel und
+Segmentneigungen von der Sensorplatine. Fehlt etwas, sagt die Oberfläche
+welches Signal und woher es käme, setzt die Kräfte auf null und schaltet zurück
+in den Handbetrieb, statt blind weiterzufahren.
 
 ## Ansicht
 
@@ -74,11 +77,18 @@ Handbetrieb, statt blind weiterzufahren.
   Arbeitsraum, die gestrichelte Linie dessen Mittellinie, das orange Kreuz das
   Ziel, der blaue Punkt die Spitze. Ein **Klick setzt das Ziel** direkt dorthin
   (im Policy-Betrieb). Rechts stehen zwei Balken für die aktuellen Seilkräfte.
+  Hängt die Sensorplatine, zeigt die grüne Linie den gemessenen Arm und die
+  blasse gestrichelte die Simulation (Legende unten links).
 
 Die Schema-Ansicht braucht keine Grafikkarte und ist die Rückfallebene, wenn
 das 3D-Rendering nicht startet.
 
 ## Hardware verbinden
+
+Die Oberfläche spricht mit zwei Geräten an zwei USB-Ports. Beide sind optional -
+ohne sie läuft alles in der Simulation weiter.
+
+### Motor-Controller (bewegt den Arm)
 
 1. USB-Kabel anstecken, **Suchen** drücken, den Port auswählen (unter Windows
    `COM3` o. ä.).
@@ -91,6 +101,36 @@ das 3D-Rendering nicht startet.
 Seillängenmessung auf die aktuelle Lage. Das ist **nur richtig, wenn der Arm
 gerade hängt** – andernfalls passen die Messwerte nicht mehr zu dem, was die
 Policy im Training gesehen hat.
+
+### Sensorplatine (misst, wo der Arm steht)
+
+1. Die Platine an einen **zweiten** USB-Port stecken und unter „Sensorplatine
+   (zweiter Port)“ auswählen.
+2. **„Sensordaten verwenden“** anhaken – der Haken ist zugleich der
+   Verbindungsschalter. Darunter stehen dann die Anzahl der empfangenen Frames
+   und der Bereich der gemessenen Winkel.
+3. Den Arm ein Stück von Hand biegen und prüfen, ob die grüne Linie im Schema
+   der wirklichen Bewegung folgt. Geht sie zur falschen Seite: **„Winkel
+   spiegeln“** anhaken.
+
+![Schema-Ansicht mit gemessener Armform](img/gui-sensoren.png)
+
+Sobald Sensordaten fließen, ändert sich die Anzeige:
+
+* Die **Schema-Ansicht** zeichnet die gemessene Armform kräftig grün, die
+  Simulation nur noch als blasse gestrichelte Linie dahinter. Der Abstand
+  zwischen beiden Linien ist der Unterschied zwischen Modell und Wirklichkeit.
+* Die **3D-Ansicht** legt die gemessene Form als grünen Strang über das Modell.
+* Die Telemetrie zeigt zusätzlich **„Spitze gemessen“** und **„Abstand
+  gemessen“**. Erst dieser zweite Wert ist eine Messung; „Abstand zum Ziel“
+  darüber ist der Wert der Simulation.
+* Im Policy-Betrieb lässt sich unter „Die Policy sieht die Sensordaten aus“ auf
+  **Hardware** umschalten – dann regelt die Policy auf den echten Gelenkwinkeln.
+
+Kommt eine Sekunde lang kein Frame mehr, gelten die Daten als veraltet: Die
+Anzeige fällt auf die Simulation zurück, und eine Policy, die die Sensorwerte
+braucht, geht in den Handbetrieb. Eine eingefrorene Armform wäre die
+gefährlichere Antwort.
 
 ## Sicherheit
 
@@ -119,6 +159,8 @@ Policy im Training gesehen hat.
 | Spitze x / z          | Position der Spitze im digitalen Zwilling [m].                        |
 | Ziel x / z            | Kommandiertes Ziel [m].                                                |
 | Abstand zum Ziel      | Der Abstand zwischen beiden, in mm – die Größe, auf die trainiert wurde. |
+| Spitze gemessen       | Wo die Spitze laut Sensorplatine wirklich steht [m].                   |
+| Abstand gemessen      | Der gemessene Zielabstand – ohne Platine leer.                          |
 | Policy-Aktion         | Die rohe Netzausgabe, bevor sie in Kräfte umgerechnet wird.            |
 | Kraft ist (HW)        | Was der Controller tatsächlich misst.                                  |
 | Seillänge (HW)        | Aufgewickelte Seillänge je Motor [mm].                                 |

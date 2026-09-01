@@ -74,6 +74,52 @@ muss, wenn er sich vom letzten Wert kaum unterscheidet. Kein Aufruf blockiert,
 und keiner wirft: Ein abgezogenes Kabel beendet die Verbindung geordnet und
 erscheint als Meldung in der Statuszeile, während die Simulation weiterläuft.
 
+== Die Sensorplatine
+
+Die zweite Quelle hängt an einem eigenen USB-Port und sendet mit 1 MBaud einen
+Binärstrom aus Frames: pro Frame ein Kopf und danach je Sensor eine Kennung und
+drei Fließkommazahlen. Der Parser sucht den Kopf, prüft Modus und Sensoranzahl
+auf Plausibilität und verlangt, dass unmittelbar hinter einem Frame der nächste
+Kopf steht - ohne diese letzte Prüfung wäre jede Bytefolge, die zufällig wie ein
+Kopf aussieht, ein Frame, und nach einem verlorenen Byte liefe der Parser
+dauerhaft falsch.
+
+Aus dem jüngsten vollständigen Frame werden die Beschleunigungen sensorweise
+geglättet, in die physische Reihenfolge gebracht, auf Länge eins normiert und
+über @eq:winkel in Gelenkwinkel umgerechnet. Solange nicht jeder der 14 Sensoren
+mindestens einmal gesehen wurde, gibt es gar keine Winkel: Ein Vektor mit einem
+Loch darin wäre schlimmer als keiner. Die Geschwindigkeiten entstehen aus einer
+gefilterten Differenzierung, wie beim Motorcontroller auch.
+
+Zwei Dinge kann die Software nicht selbst wissen, weil sie vom Einbau abhängen:
+die Zuordnung der Sensorkennungen zu den Segmenten und das Vorzeichen der
+Winkel. Für das Vorzeichen gibt es einen Schalter in der Oberfläche, der sofort
+wirkt - biegt sich der Arm in der Anzeige zur falschen Seite, ist er gemeint.
+Die Zuordnung steht als Konstante im Quelltext.
+
+Ein dritter Punkt betrifft die Sicherheit der Anzeige: Sensordaten gelten nur
+als Messung, solange frische Frames ankommen. Bleibt der Strom stehen, fällt die
+Anzeige nach einer Sekunde auf die Simulation zurück und eine Policy, die diese
+Signale braucht, geht in den Handbetrieb. Eine eingefrorene Armform, die als
+aktueller Zustand ausgegeben wird, wäre die gefährlichere Antwort.
+
+== Von den Winkeln zur Armform
+
+Der SpiRob kann seine eigene Spitze nicht messen. Die Gelenkwinkel und die
+Gliedlängen genügen aber: Die Neigung eines Segments ist die Summe aller
+Gelenkwinkel davor, und die Kette der gedrehten Gliedvektoren ergibt jeden
+Stützpunkt bis hin zur Spitze. Die Gliedlängen werden dabei nicht als Konstante
+gepflegt, sondern beim Start aus demselben MJCF gelesen, auf dem die Policies
+trainiert wurden - eine kopierte Zahl wäre eine Zahl, die still veraltet.
+
+Der Nachweis, dass diese Rechnung stimmt, ist billig zu haben: Füttert man sie
+mit den Gelenkwinkeln der Simulation, muss sie deren Spitzenposition treffen.
+Gemessen stimmen beide auf $10^(-16)$ m überein.
+
+Damit bekommt die Oberfläche eine Größe, die es vorher nicht gab: den Abstand
+zwischen kommandiertem Ziel und *gemessener* Spitze. Genau darauf ist im
+Training belohnt worden, und genau das konnte die Maschine bisher nicht sagen.
+
 == Oberfläche
 
 #figure(
@@ -89,9 +135,23 @@ es nicht, denn außerhalb zu extrapolieren ist ein legitimes Experiment.
 
 Die Auswahl der Datenquelle für die Beobachtung ist der Punkt, an dem
 Simulation und Hardware sichtbar auseinandertreten. Verlangt eine Policy
-Signale, die der angeschlossene Controller nicht liefert, wird sie nicht
-stillschweigend mit Ersatzwerten gefahren: Die Anwendung fällt in den
-Handbetrieb zurück, setzt die Kräfte auf null und nennt den Grund.
+Signale, die kein angeschlossenes Gerät liefert, wird sie nicht stillschweigend
+mit Ersatzwerten gefahren: Die Anwendung fällt in den Handbetrieb zurück, setzt
+die Kräfte auf null und nennt sowohl das fehlende Signal als auch das Gerät, das
+es liefern würde.
+
+Hängt die Sensorplatine, wechselt die Anzeige ihre Aussage (@fig:gui-sensoren).
+Im Schema wird die gemessene Armform zur Hauptlinie und die Simulation nur noch
+zur blassen gestrichelten Kurve dahinter; der Abstand zwischen beiden ist der
+Sim-to-Real-Unterschied, und er soll sichtbar sein. In der 3D-Ansicht wird die
+Messung als Strang über das Modell gelegt. Die Telemetrie bekommt zwei Felder
+dazu, "Spitze gemessen" und "Abstand gemessen" - ohne Platine bleiben sie leer,
+statt die Simulation als Messung auszugeben.
+
+#figure(
+  image("../Images/gui-sensoren.png", width: 100%),
+  caption: [Mit angeschlossener Sensorplatine zeigt das Schema den gemessenen Arm (grün) und die Simulation als blasse gestrichelte Linie. Die Telemetrie nennt beide Zielabstände getrennt.],
+) <fig:gui-sensoren>
 
 #figure(
   image("../Images/gui-schema.png", width: 100%),
@@ -111,12 +171,17 @@ pySerial und Pillow - Tkinter gehört zur Standardinstallation von Python.
 
 == Tests
 
-Die Testsuite umfasst 36 Tests und läuft in wenigen Sekunden. Geprüft werden
+Die Testsuite umfasst 51 Tests und läuft in wenigen Sekunden. Geprüft werden
 das Layout jeder Policy gegen ihr Netz, die
 Vollständigkeit der von der Simulation gelieferten Signale, das Auffüllen der
 Historie beim ersten Takt, die Aktionsgrenze, die Kraftabbildung an ihren
 Rändern, das Verhalten des Regelkreises (Kraftgrenze, Not-Aus, Rückfall bei
-fehlender Sensorik) sowie die Geometrie des Arbeitsraums. Dazu kommt ein
+fehlender Sensorik) sowie die Geometrie des Arbeitsraums. Die Anbindung der
+Sensorplatine wird über ein virtuelles Terminalpaar geprüft: Der Test schreibt
+synthetische Frames auf eine echte serielle Leitung und erwartet am anderen Ende
+genau die Winkel, aus denen er sie erzeugt hat - damit läuft der vollständige
+Weg vom Byte bis zum Gelenkwinkel im Test, ohne dass Hardware angeschlossen sein
+muss. Dazu kommt ein
 Rauchtest, der die Oberfläche einmal vollständig durchklickt und dabei prüft,
 dass ohne Verbindung nichts gesendet wird und eine Policy ohne Sensordaten in
 den Handbetrieb zurückfällt; er wird übersprungen, wenn kein Fenstersystem

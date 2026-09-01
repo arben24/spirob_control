@@ -200,6 +200,7 @@ class RobotView(ttk.Frame):
       camera = self._ensure_camera()
       self._renderer.update_scene(self.sim.data, camera)
       self._add_target_marker(telemetry)
+      self._add_measured_chain(telemetry)
       frame = self._renderer.render()
       # Auf die Zeichenfläche bringen: normalerweise passt das Bild exakt, nur
       # während einer Größenänderung oder oberhalb der Obergrenze wird skaliert.
@@ -234,13 +235,57 @@ class RobotView(ttk.Frame):
     )
     scene.ngeom += 1
 
+  def _add_measured_chain(self, telemetry) -> None:
+    """Die gemessene Armform als Kapselzug über das Simulationsmodell legen.
+
+    Hängt die Sensorplatine, zeigt die 3D-Ansicht nur das Modell. Mit ihr sieht
+    man beides übereinander: das Modell in seinen eigenen Farben und die
+    Messung als durchgehenden Strang - der Unterschied zwischen beiden ist
+    genau der Sim-to-Real-Abstand.
+    """
+    import mujoco
+
+    chain = telemetry.measured_chain_xz
+    if chain is None:
+      return
+    scene = self._renderer.scene
+    color = np.array([0.25, 0.85, 0.6, 0.95], dtype=np.float32)
+    for start, end in zip(chain[:-1], chain[1:]):
+      if scene.ngeom >= scene.maxgeom:
+        return
+      geom = scene.geoms[scene.ngeom]
+      mujoco.mjv_initGeom(
+        geom,
+        type=mujoco.mjtGeom.mjGEOM_CAPSULE,
+        size=np.zeros(3),
+        pos=np.zeros(3),
+        mat=np.eye(3).flatten(),
+        rgba=color,
+      )
+      # mjv_connector spannt die Kapsel zwischen zwei Punkten auf und übernimmt
+      # dabei Länge und Ausrichtung - von Hand wäre das eine Rotationsmatrix.
+      mujoco.mjv_connector(
+        geom,
+        mujoco.mjtGeom.mjGEOM_CAPSULE,
+        0.006,
+        np.array([start[0], 0.0, start[1]]),
+        np.array([end[0], 0.0, end[1]]),
+      )
+      scene.ngeom += 1
+
   def _draw_hud(self, telemetry, width: int, height: int) -> None:
     """Knappe Einblendung im 3D-Bild: was gerade gilt."""
     lines = [
-      f"Ziel   x {telemetry.target_xz[0]:+.3f} m   z {telemetry.target_xz[1]:+.3f} m",
-      f"Spitze x {telemetry.tcp_xz[0]:+.3f} m   z {telemetry.tcp_xz[1]:+.3f} m",
-      f"Abstand {telemetry.error_m * 1000:.0f} mm",
+      f"Ziel      x {telemetry.target_xz[0]:+.3f} m   z {telemetry.target_xz[1]:+.3f} m",
+      f"Sim       x {telemetry.tcp_xz[0]:+.3f} m   z {telemetry.tcp_xz[1]:+.3f} m"
+      f"   Abstand {telemetry.error_m * 1000:4.0f} mm",
     ]
+    if telemetry.measured_tcp_xz is not None:
+      lines.append(
+        f"Gemessen  x {telemetry.measured_tcp_xz[0]:+.3f} m   "
+        f"z {telemetry.measured_tcp_xz[1]:+.3f} m"
+        f"   Abstand {telemetry.measured_error_m * 1000:4.0f} mm"
+      )
     self.canvas.create_text(
       14, height - 14, anchor="sw", justify="left", text="\n".join(lines),
       fill=theme.TEXT, font=("TkFixedFont", 9),
@@ -283,16 +328,18 @@ class RobotView(ttk.Frame):
     canvas.create_text(16, height - 26, anchor="sw", text="100 mm",
                        fill=theme.MUTED, font=("TkFixedFont", 8))
 
-    # Die Kette selbst.
-    chain = telemetry.chain_xz
-    if chain is not None and len(chain) > 1:
-      points = [coord for point in chain for coord in to_px(point)]
-      canvas.create_line(points, fill="#2f7d5c", width=9, capstyle="round", joinstyle="round")
-      canvas.create_line(points, fill=theme.OK, width=4, capstyle="round", joinstyle="round")
-      for point in chain[1:-1]:
-        px, py = to_px(point)
-        canvas.create_oval(px - 2.5, py - 2.5, px + 2.5, py + 2.5,
-                           fill=theme.BG, outline=theme.OK)
+    # Die Kette. Mit Sensorplatine ist die gemessene Form die Hauptaussage und
+    # die Simulation nur noch der blasse Vergleich dahinter - der Abstand
+    # zwischen beiden Linien ist der Sim-to-Real-Unterschied, und den soll man
+    # sehen können.
+    measured = telemetry.measured_chain_xz
+    if measured is not None:
+      self._draw_chain(to_px, telemetry.chain_xz, ghost=True)
+      self._draw_chain(to_px, measured, ghost=False)
+      tip = telemetry.measured_tcp_xz
+    else:
+      self._draw_chain(to_px, telemetry.chain_xz, ghost=False)
+      tip = telemetry.tcp_xz
 
     # Ziel (Kreuz) und Spitze (Punkt), dazu der Abstand zwischen beiden.
     tx, ty = to_px(telemetry.target_xz)
@@ -300,18 +347,29 @@ class RobotView(ttk.Frame):
     canvas.create_line(tx - 13, ty, tx + 13, ty, fill=theme.WARN, width=1)
     canvas.create_line(tx, ty - 13, tx, ty + 13, fill=theme.WARN, width=1)
 
-    cx, cy = to_px(telemetry.tcp_xz)
-    canvas.create_line(tx, ty, cx, cy, fill=theme.MUTED, dash=(3, 3))
-    canvas.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill=theme.ACCENT, outline="")
+    if tip is not None:
+      cx, cy = to_px(tip)
+      canvas.create_line(tx, ty, cx, cy, fill=theme.MUTED, dash=(3, 3))
+      canvas.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill=theme.ACCENT, outline="")
 
+    lines = [
+      f"Ziel      x {telemetry.target_xz[0]:+.3f}  z {telemetry.target_xz[1]:+.3f} m",
+      f"Simulation x {telemetry.tcp_xz[0]:+.3f}  z {telemetry.tcp_xz[1]:+.3f} m"
+      f"   Abstand {telemetry.error_m * 1000:4.0f} mm",
+    ]
+    if telemetry.measured_tcp_xz is not None:
+      lines.append(
+        f"Gemessen  x {telemetry.measured_tcp_xz[0]:+.3f}  "
+        f"z {telemetry.measured_tcp_xz[1]:+.3f} m"
+        f"   Abstand {telemetry.measured_error_m * 1000:4.0f} mm"
+      )
     canvas.create_text(
       14, 14, anchor="nw", justify="left", fill=theme.MUTED, font=("TkFixedFont", 9),
-      text=(
-        f"Ziel   x {telemetry.target_xz[0]:+.3f}  z {telemetry.target_xz[1]:+.3f} m\n"
-        f"Spitze x {telemetry.tcp_xz[0]:+.3f}  z {telemetry.tcp_xz[1]:+.3f} m\n"
-        f"Abstand {telemetry.error_m * 1000:.0f} mm"
-      ),
+      text="\n".join(lines),
     )
+
+    if measured is not None:
+      self._draw_legend(height)
 
     if self.on_pick is not None:
       canvas.create_text(width - 14, height - 14, anchor="se", text="Klick setzt das Ziel",
@@ -319,6 +377,41 @@ class RobotView(ttk.Frame):
 
     # Kraftbalken je Seil, damit man die Stellgröße auch im Schema sieht.
     self._draw_force_bars(telemetry, width, height)
+
+  def _draw_chain(self, to_px, chain, ghost: bool) -> None:
+    """Einen Kettenzug zeichnen: kräftig als Messung, blass als Vergleich."""
+    if chain is None or len(chain) < 2:
+      return
+    points = [coord for point in chain for coord in to_px(point)]
+    if ghost:
+      self.canvas.create_line(points, fill="#61748a", width=2, dash=(5, 4),
+                              capstyle="round", joinstyle="round")
+      return
+    self.canvas.create_line(points, fill="#2f7d5c", width=9, capstyle="round",
+                            joinstyle="round")
+    self.canvas.create_line(points, fill=theme.OK, width=4, capstyle="round",
+                            joinstyle="round")
+    for point in chain[1:-1]:
+      px, py = to_px(point)
+      self.canvas.create_oval(px - 2.5, py - 2.5, px + 2.5, py + 2.5,
+                              fill=theme.BG, outline=theme.OK)
+
+  def _draw_legend(self, height: int) -> None:
+    """Sagt, welche Linie was ist - sobald zwei Armformen im Bild sind.
+
+    Unten links, oberhalb des Maßstabs: dort ist die Zeichenfläche frei, und
+    die Kraftbalken oben rechts bleiben unangetastet.
+    """
+    canvas = self.canvas
+    for offset, color, dash, label, fill in (
+      (70, theme.OK, None, "gemessen", theme.TEXT),
+      (52, "#61748a", (5, 4), "Simulation", theme.MUTED),
+    ):
+      y = height - offset
+      canvas.create_line(14, y, 36, y, fill=color, width=4 if dash is None else 2,
+                         dash=dash, capstyle="round")
+      canvas.create_text(42, y, anchor="w", text=label, fill=fill,
+                         font=("TkFixedFont", 8))
 
   def _draw_force_bars(self, telemetry, width: int, height: int) -> None:
     canvas = self.canvas

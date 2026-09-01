@@ -19,6 +19,7 @@ geordnet.
     [A5], [Not-Aus und eine Kraftobergrenze sind immer erreichbar.],
     [A6], [Fehler im Betrieb (Kabel gezogen, kein Treiber, keine Grafikbeschleunigung) führen zu einer Meldung, nicht zum Absturz.],
     [A7], [Nach `git clone` ist die Anwendung unter Windows in wenigen Minuten startbar.],
+    [A8], [Die vorhandene Sensorik ist über einen zweiten USB-Port einbindbar; die Anzeige zeigt dann den gemessenen Arm, und jede Policy kann auf gemessenen Daten laufen.],
   ),
   caption: [Anforderungen an die Bedienoberfläche.],
 ) <tab:anforderungen>
@@ -43,6 +44,16 @@ nachgebaut. Der Preis dafür ist, dass das Layout nun an zwei Stellen existiert
 und auseinanderlaufen kann; dagegen hilft nur, es beim Export gegen die
 Netzdimension und zur Laufzeit gegen die gelieferten Signale zu prüfen - und
 das Ganze in einem Rollout zu testen (@sec:messungen).
+
+*Geräte als austauschbare Quellen.* Eine Policy verlangt Signale, keine Geräte.
+Deshalb meldet jede Hardwarequelle, welche Signale sie liefert, und der
+Regelkreis führt darüber Buch; ob eine Policy fahrbar ist, entscheidet allein
+der Abgleich beider Listen (A8). Das kostet ein paar Zeilen mehr als eine
+direkte Abfrage, hat aber zwei Folgen, die den Aufwand tragen: Eine dritte
+Quelle bedeutet keine Änderung an der Prüfung, und eine Policy mit fehlenden
+Signalen wird nie mit Ersatzwerten gefahren - sie fällt in den Handbetrieb
+zurück, mit einer Meldung, welches Signal fehlt und welches Gerät es liefern
+würde.
 
 *Die Simulation läuft immer.* Sie ist Anzeige und Vergleichsmaßstab zugleich.
 Damit erfüllt A4 sich fast von selbst: Es gibt immer etwas zu sehen, auch ohne
@@ -84,7 +95,9 @@ Die Zerlegung folgt der Frage, was ohne Fenster testbar sein muss.
     [`controller`], [ein Regelschritt: Modus, Kräfte, Sicherheitsgrenze, Telemetrie],
     [`simulation`], [MuJoCo-Modell, Regelschritt, Sensorsignale],
     [`policy`], [Beobachtungsvektor, Vorwärtspass, Aktionsgrenze],
-    [`hardware`], [serielle Verbindung, nicht blockierend],
+    [`hardware`], [Motor-Controller: Kraftkommandos und Telemetrie, nicht blockierend],
+    [`sensors`], [Sensorplatine: Frames, Gelenkwinkel, Segmentneigungen],
+    [`kinematics`], [Armform und Spitze aus den Gelenkwinkeln],
     [`view`], [3D-Bild und Schema],
     [`workspace`], [Geometrie des Arbeitsraums, nur Standardbibliothek],
   ),

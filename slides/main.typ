@@ -95,6 +95,31 @@
   ]
 )
 
+== Zwei Quellen, ein Beobachtungsvektor
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 1.5em,
+  [
+    - *Motor-Controller* (USB 1): Seilkraft, Seillänge
+    - *Sensorplatine* (USB 2): 14 Beschleunigungssensoren $arrow.r$ 13 Gelenkwinkel
+    - Daraus die *gemessene* Armform - der Roboter kann seine Spitze sonst nicht sehen
+    - Fehlt einer Policy ein Signal: Handbetrieb statt Ersatzwerte
+
+    #text(weight: "bold", fill: htwk-cyan)[
+      Aus dem angezeigten Zielabstand wird eine Messung.
+    ]
+  ],
+  [
+    #align(center + horizon)[
+      #rect(stroke: 0.5pt + htwk-lightgray, inset: 6pt, radius: 4pt)[
+        #image("Images/gui-sensoren.png", height: 11em)
+        #v(0.2em)
+        #text(size: 7pt, fill: htwk-gray)[Grün: gemessen. Gestrichelt: Simulation.]
+      ]
+    ]
+  ]
+)
+
 == Die Policy ohne PyTorch
 - Der Actor ist ein MLP aus *Linear + ELU*, deterministisch ausgewertet
 - Exportiert werden nur die *Gewichte* plus ein Manifest des Beobachtungslayouts
@@ -146,14 +171,15 @@ rechnet das Netz weiter - der Arm bewegt sich einfach falsch.
     === Erreicht
     - Zwei Betriebsarten in einer Oberfläche
     - Vier Policies ohne Trainingsstack nutzbar
-    - Stabile 50 Hz, 36 automatisierte Tests
+    - Sensorplatine eingebunden: alle vier Level auch auf der Hardware
+    - Stabile 50 Hz, 51 automatisierte Tests
     - `git clone` + Doppelklick unter Windows
   ],
   [
     === Nächste Schritte
-    - Beschleunigungssensor-Platine als zweite Datenquelle
-    - Damit: `imu`/`joints` auf der Hardware und die *gemessene* Spitzenposition
-    - Messreihen am realen Aufbau, Sim-to-Real je Sensor-Level
+    - Messreihen am realen Aufbau: Sim-to-Real je Sensor-Level
+    - Aufzeichnen der Messfahrten aus der Oberfläche heraus
+    - Einbaulage der Platine automatisch prüfen
   ]
 )
 

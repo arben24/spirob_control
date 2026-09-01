@@ -8,7 +8,11 @@ Anwendung geworden. Der SpiRob lässt sich nun auf zwei Wegen fahren: von Hand
 und über eine trainierte Policy, der nur noch die Zielposition der Spitze
 gesagt wird. Beide Betriebsarten laufen gegen den digitalen Zwilling und lassen
 sich bewusst auf die reale Hardware zuschalten; Not-Aus und Kraftgrenze sind
-dabei jederzeit erreichbar.
+dabei jederzeit erreichbar. Über einen zweiten USB-Port kommt die Sensorplatine
+hinzu: Aus den Neigungen ihrer 14 Beschleunigungssensoren folgen die
+Gelenkwinkel und daraus die tatsächliche Form des Arms. Damit zeigt die Anzeige
+den echten Roboter statt nur das Modell, jede der vier Policies ist auch auf der
+Maschine fahrbar, und der angezeigte Zielabstand ist eine Messung.
 
 Der technisch tragende Teil ist der Export der Regelungen. Weil die Actor-Netze
 deterministisch ausgewertet werden können und ausschließlich aus linearen
@@ -22,24 +26,24 @@ Dass der Nachbau dem Training entspricht, wurde nicht behauptet, sondern
 gemessen: Über elf Zielwinkel hinweg stimmen Rangfolge und Größenordnung der
 Zielabweichungen mit den Trainingswerten überein, einschließlich des erwarteten
 Scheiterns des sensorlosen Levels. Der Regelkreis hält dabei stabil 50 Hz und
-nutzt etwa ein Achtel des verfügbaren Zeitbudgets, ohne Nebenläufigkeit und
+nutzt etwa ein Fünftel des verfügbaren Zeitbudgets, ohne Nebenläufigkeit und
 damit ohne die Fehlerquellen, die sie mit sich brächte.
 
 == Ausblick
 
-*Die zweite Datenquelle.* Der größte offene Punkt ist die Anbindung der
-Beschleunigungssensor-Platine. Sie liefert die 13 Gelenkwinkel und damit
-gleich dreierlei: Sie macht die genaueren Sensor-Level `imu` und `joints` auch
-auf der Hardware fahrbar, sie erlaubt über die Vorwärtskinematik die
-*gemessene* Position der Spitze - und damit wird der im Fenster angezeigte
-Zielabstand im Hardwarebetrieb von einer Erwartung zu einer Messung. Die
-Schnittstelle dafür ist vorbereitet: Eine weitere Quelle mit denselben vier
-Methoden genügt, und die Prüfung, welche Policy damit lauffähig ist, geschieht
-bereits automatisch.
+*Messreihen am realen Aufbau.* Der nächste Schritt ist die Auswertung aus
+@sec:messungen auf der Maschine statt in der Simulation: Zielabweichung je
+Sensor-Level über den ganzen Arbeitsraum, gefahren mit angeschlossener
+Sensorplatine. Alles Nötige ist vorhanden - die Oberfläche zeigt den gemessenen
+Zielabstand live an -, es fehlt nur das Aufzeichnen dieser Werte aus der
+Oberfläche heraus und die Zeit am Aufbau. Damit ließe sich der
+Sim-to-Real-Abstand je Sensor-Level beziffern, die Frage, auf die die gesamte
+Ablation hinausläuft.
 
-*Messreihen am realen Aufbau.* Mit dieser Erweiterung ließe sich die Auswertung
-aus @sec:messungen auf der Hardware wiederholen und der Sim-to-Real-Abstand je
-Sensor-Level beziffern - die Frage, auf die die gesamte Ablation hinausläuft.
+*Selbstprüfung des Einbaus.* Sensorzuordnung und Vorzeichen der Winkel muss
+heute ein Mensch durch Hinsehen bestätigen. Beides ließe sich weitgehend
+automatisch feststellen, indem die Anwendung ein einzelnes Seil kurz anzieht und
+beobachtet, welche Winkel sich in welche Richtung ändern.
 
 *Weitere Aufgaben.* Im Trainingsprojekt existieren Policies für weitere
 Aufgaben: eine Form vorgeben, einer Trajektorie folgen, ein Objekt umgreifen.

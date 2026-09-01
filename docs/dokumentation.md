@@ -18,7 +18,9 @@ Genau darauf ist die Oberfläche zugeschnitten. Sie kennt zwei Betriebsarten:
 | **Policy**      | eine Zielposition der Spitze             | eine trainierte Regelung bestimmt daraus 50-mal je Sekunde die Seilkräfte |
 
 In beiden Fällen läuft der digitale Zwilling (MuJoCo) mit und zeigt, was der
-Roboter gerade tut – mit oder ohne angeschlossene Hardware.
+Roboter gerade tut – mit oder ohne angeschlossene Hardware. Hängt zusätzlich
+die Sensorplatine am zweiten USB-Port, zeigt die Anzeige, wo der echte Arm
+wirklich steht, und die Policy kann auf den gemessenen Gelenkwinkeln regeln.
 
 ## Die Seiten dieser Dokumentation
 
@@ -41,7 +43,9 @@ src/
 │   ├── controller.py        Regelkreis (Modus, Kräfte, Sicherheitsgrenze)
 │   ├── simulation.py        MuJoCo-Modell, Regelschritt, Sensorsignale
 │   ├── policy.py            Vorwärtspass der trainierten Netze (NumPy)
-│   ├── hardware.py          serielle Verbindung zum ESP32
+│   ├── hardware.py          serielle Verbindung zum Motor-Controller
+│   ├── sensors.py           serielle Verbindung zur Sensorplatine
+│   ├── kinematics.py        Armform und Spitze aus den Gelenkwinkeln
 │   ├── view.py              3D-Ansicht und Schema-Ansicht
 │   ├── workspace.py         Geometrie des erreichbaren Arbeitsraums
 │   ├── theme.py             Farben und Stile
